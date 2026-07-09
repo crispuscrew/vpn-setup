@@ -27,6 +27,8 @@ func main() {
 		err = runApply(args)
 	case "status":
 		err = runStatus(args)
+	case "health":
+		err = runHealth(args)
 	case "sub":
 		err = runSub(args)
 	case "version", "--version", "-v":
@@ -50,6 +52,7 @@ func usage() {
 usage:
   vpn apply [-f vpn.yaml]     reconcile the panel to the declared config-as-code
   vpn status                  list discovered inbounds, services, and users
+  vpn health                  check panel + node health (non-zero exit if degraded)
   vpn sub <user> [--format]   print a user's subscription URL (or fetch its body)
   vpn version                 print the tool version
   vpn help                    show this help
