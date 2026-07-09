@@ -1,0 +1,35 @@
+{
+  "log": { "loglevel": "warning" },
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      { "type": "field", "ip": ["geoip:private"], "outboundTag": "block" }
+    ]
+  },
+  "inbounds": [
+    {
+      "tag": "VLESS_REALITY",
+      "listen": "0.0.0.0",
+      "port": {{ reality_port }},
+      "protocol": "vless",
+      "settings": { "clients": [], "decryption": "none" },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "{{ reality_sni }}:443",
+          "xver": 0,
+          "serverNames": ["{{ reality_sni }}"],
+          "privateKey": "{{ reality.private_key }}",
+          "shortIds": ["{{ reality.short_id }}"]
+        }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
+    }
+  ],
+  "outbounds": [
+    { "protocol": "freedom", "tag": "direct" },
+    { "protocol": "blackhole", "tag": "block" }
+  ]
+}

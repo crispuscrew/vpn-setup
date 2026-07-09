@@ -1,0 +1,7 @@
+- name: restart marznode
+  ansible.builtin.command:
+    cmd: docker compose restart marznode
+    chdir: "{{ node_compose_dir }}"
+
+- name: reload firewalld
+  ansible.builtin.command: firewall-cmd --reload

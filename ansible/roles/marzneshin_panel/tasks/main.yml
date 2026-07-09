@@ -1,0 +1,54 @@
+# Bring up the Marzneshin panel (pinned, SQLite, host-networked) and create the
+# sudo admin non-interactively from SUDO_USERNAME/SUDO_PASSWORD.
+- name: Ensure panel directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ panel_compose_dir }}"
+    - "{{ marzneshin_data_dir }}"
+
+- name: Render panel .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ panel_compose_dir }}/.env"
+    mode: "0600"
+  no_log: true
+
+- name: Render panel compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ panel_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Open the panel port in firewalld
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ panel_port }}/tcp"
+  register: _fw_panel
+  changed_when: "'ALREADY_ENABLED' not in _fw_panel.stdout"
+  notify: reload firewalld
+
+- name: Start the panel
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ panel_compose_dir }}"
+  register: _panel_up
+  changed_when: >-
+    ('Started' in _panel_up.stderr) or ('Created' in _panel_up.stderr)
+    or ('Recreated' in _panel_up.stderr)
+
+- name: Wait for the panel API to answer
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/dashboard/"
+    status_code: [200]
+  register: _panel_health
+  retries: 40
+  delay: 3
+  until: _panel_health.status == 200
+
+- name: Create/sync the sudo admin from env
+  ansible.builtin.command:
+    cmd: docker compose exec -T marzneshin python3 marzneshin-cli.py admin import-from-env --yes
+    chdir: "{{ panel_compose_dir }}"
+  register: _admin
+  changed_when: "'imported successfully' in _admin.stdout"

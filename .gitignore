@@ -1,0 +1,19 @@
+# Go build output + container go cache
+/bin/
+/.cache/
+
+# Ansible per-deployment inventory + secrets (templates are tracked)
+ansible/inventory/*
+!ansible/inventory/*.example
+ansible/.secrets/
+
+# Secrets and credentials — never commit
+*.pem
+*.key
+*.crt
+.env
+.vault_pass
+
+# Bot delivery state + fetched artefacts
+/state/
+/configs/

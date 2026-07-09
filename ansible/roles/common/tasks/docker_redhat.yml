@@ -1,0 +1,32 @@
+# Install Docker CE + the compose plugin from Docker's own repo. Marzneshin is
+# upstream-tested on Docker; we run its stack there (our own build pipeline stays
+# on Podman). Podman may coexist — Docker uses its own daemon.
+- name: Add the Docker CE repository
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: "0644"
+
+- name: Install Docker engine and compose plugin
+  ansible.builtin.dnf:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Confirm docker compose is available
+  ansible.builtin.command: docker compose version
+  register: _compose_version
+  changed_when: false
+
+- name: Show docker compose version
+  ansible.builtin.debug:
+    msg: "{{ _compose_version.stdout }}"

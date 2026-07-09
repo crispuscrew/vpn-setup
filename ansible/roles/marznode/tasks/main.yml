@@ -1,0 +1,164 @@
+# Bring up marznode all-in-one (loopback/INSECURE) with a VLESS-Reality inbound,
+# then make the panel's local node connect and verify it is healthy.
+- name: Ensure node directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ node_compose_dir }}"
+    - "{{ marznode_dir }}"
+
+# ── Reality keypair + shortId: generated once, persisted, reused ──────────────
+- name: Check for persisted Reality keys
+  ansible.builtin.stat:
+    path: "{{ marznode_dir }}/reality.json"
+  register: _reality_stat
+
+- name: Generate and persist Reality keys
+  when: not _reality_stat.stat.exists
+  block:
+    - name: Generate an x25519 keypair with xray
+      ansible.builtin.command: "docker run --rm --entrypoint /usr/local/bin/xray {{ marznode_image }} x25519"
+      register: _x25519
+      changed_when: true
+
+    - name: Generate a Reality shortId
+      ansible.builtin.command: openssl rand -hex 8
+      register: _shortid
+      changed_when: true
+
+    - name: Persist the Reality keys
+      ansible.builtin.copy:
+        dest: "{{ marznode_dir }}/reality.json"
+        mode: "0600"
+        content: |
+          {{ {
+            'private_key': _x25519.stdout | regex_findall('Private key: (\S+)') | first,
+            'public_key':  _x25519.stdout | regex_findall('Public key: (\S+)') | first,
+            'short_id':    _shortid.stdout | trim
+          } | to_nice_json }}
+
+- name: Load the persisted Reality keys
+  ansible.builtin.slurp:
+    src: "{{ marznode_dir }}/reality.json"
+  register: _reality_raw
+
+- name: Expose the Reality keys as a fact
+  ansible.builtin.set_fact:
+    reality: "{{ _reality_raw.content | b64decode | from_json }}"
+
+# ── Config + compose ─────────────────────────────────────────────────────────
+- name: Render the xray core config (Reality inbound)
+  ansible.builtin.template:
+    src: xray_config.json.j2
+    dest: "{{ marznode_dir }}/xray_config.json"
+    mode: "0644"
+  notify: restart marznode
+
+- name: Render the marznode env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ node_compose_dir }}/.env"
+    mode: "0644"
+  notify: restart marznode
+
+- name: Render the marznode compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ node_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Open the Reality port in firewalld
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ reality_port }}/tcp"
+  register: _fw_reality
+  changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
+  notify: reload firewalld
+
+- name: Start marznode
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ node_compose_dir }}"
+  register: _node_up
+  changed_when: >-
+    ('Started' in _node_up.stderr) or ('Created' in _node_up.stderr)
+    or ('Recreated' in _node_up.stderr)
+
+- name: Apply any pending restart before health-checking
+  ansible.builtin.meta: flush_handlers
+
+# ── Register (if needed) and verify the panel↔node link ──────────────────────
+- name: Authenticate to the panel
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/admins/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ panel_sudo_username }}"
+      password: "{{ panel_sudo_password }}"
+  register: _tok
+  no_log: true
+
+- name: List existing nodes
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _nodes
+
+- name: Register the local node if none targets 127.0.0.1
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+    body_format: json
+    body:
+      name: local
+      address: 127.0.0.1
+      port: "{{ marznode_port | int }}"
+      connection_backend: grpcio
+      usage_coefficient: 1
+    status_code: [200, 409]
+  when: (_nodes.json['items'] | selectattr('address', 'equalto', '127.0.0.1') | list | length) == 0
+
+- name: Re-list nodes and pick the local one
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _nodes2
+
+- name: Record the local node id
+  ansible.builtin.set_fact:
+    _local_node_id: "{{ (_nodes2.json['items'] | selectattr('address', 'equalto', '127.0.0.1') | map(attribute='id') | first) }}"
+
+# A fresh channel was opened while marznode was down; modifying the node forces
+# the panel to drop and re-add it, connecting to the now-running node.
+- name: Force the panel to (re)connect the node
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _local_node_id }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+    body_format: json
+    body:
+      name: local
+      address: 127.0.0.1
+      port: "{{ marznode_port | int }}"
+      connection_backend: grpcio
+      usage_coefficient: 1
+
+- name: Wait for the node to become healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _local_node_id }}"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _node_status
+  retries: 24
+  delay: 5
+  until: _node_status.json.status == 'healthy'
+
+- name: Show node status + discovered backends
+  ansible.builtin.debug:
+    msg: "node '{{ _node_status.json.name }}' is {{ _node_status.json.status }}; backends={{ _node_status.json.backends | map(attribute='name') | list }}"

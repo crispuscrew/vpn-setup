@@ -1,0 +1,9 @@
+- name: Deploy the Marzneshin VPN stack
+  hosts: all
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../versions.yml"
+  roles:
+    - common
+    - marzneshin_panel
+    - marznode

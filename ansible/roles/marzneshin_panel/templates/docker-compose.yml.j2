@@ -1,0 +1,9 @@
+# Managed by Ansible (vpn-setup). Marzneshin panel, pinned; SQLite; host-networked.
+services:
+  marzneshin:
+    image: {{ marzneshin_image }}
+    restart: always
+    env_file: .env
+    network_mode: host
+    volumes:
+      - {{ marzneshin_data_dir }}:/var/lib/marzneshin

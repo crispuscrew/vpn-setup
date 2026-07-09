@@ -1,0 +1,10 @@
+# Managed by Ansible (vpn-setup). marznode, pinned; host-networked; reads its
+# core config from the mounted /var/lib/marznode.
+services:
+  marznode:
+    image: {{ marznode_image }}
+    restart: always
+    env_file: .env
+    network_mode: host
+    volumes:
+      - {{ marznode_dir }}:/var/lib/marznode

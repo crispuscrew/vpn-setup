@@ -1,0 +1,5 @@
+# Pinned upstream versions — the single source of truth for image tags.
+# Never use :latest (dev-rules/tech/containers.md). Bump deliberately: a change
+# here ripples to every deployment this repo drives.
+marzneshin_image: "docker.io/dawsh/marzneshin:v0.7.4"
+marznode_image: "docker.io/dawsh/marznode:v0.5.7"
