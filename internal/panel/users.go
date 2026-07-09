@@ -69,3 +69,13 @@ func (c *Client) UpdateUser(ctx context.Context, username, expireStrategy string
 func (c *Client) DeleteUser(ctx context.Context, username string) error {
 	return c.do(ctx, http.MethodDelete, "/api/users/"+username, nil, nil)
 }
+
+// RevokeSubscription rotates a user's key so their current subscription URL stops
+// working (a fresh one is issued in its place).
+func (c *Client) RevokeSubscription(ctx context.Context, username string) (*User, error) {
+	var out User
+	if err := c.do(ctx, http.MethodPost, "/api/users/"+username+"/revoke_sub", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

@@ -68,11 +68,28 @@ vpn status                # discovered inbounds, services, users
 vpn sub <user>            # print a user's subscription URL
 ```
 
+## Delivery bot
+
+`vpnbot` hands each user their subscription over Telegram. An admin runs
+`/add <username>` — which creates the panel user and returns a one-time claim link;
+the recipient taps it (`/start <code>`) and receives their subscription URL + QR
+exactly once, tracked in a durable ledger and re-shown on demand. `/help`, `/list`,
+and `/revoke <username>` round out the admin face. Every secret is environment-only:
+
+```
+make image                         # build the small non-root container
+# then run it with these set (plus the VPN_PANEL_* credentials):
+#   VPNBOT_TOKEN     bot token from @BotFather
+#   VPNBOT_ADMINS    comma-separated admin Telegram user ids
+# mount a writable volume at /state for the delivery ledger.
+```
+
 ## Layout
 
 - `cmd/vpn/` — operator CLI (panel REST reconcile: services, users, subscriptions).
-- `cmd/vpnbot/` — Telegram delivery bot (subscription URL + QR, exactly-once) *(in progress)*.
+- `cmd/vpnbot/` — Telegram delivery bot (subscription URL + QR, exactly-once) and its `Containerfile`.
 - `internal/panel/` — typed Marzneshin REST client shared by the binaries.
+- `internal/ledger/` — the bot's durable, atomically-written exactly-once delivery ledger.
 - `ansible/` — host + node provisioning and node core-config templates.
 - `vpn.yaml` — declared panel state applied by `vpn apply`.
 - `versions.yml` — pinned upstream image tags.

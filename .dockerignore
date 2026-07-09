@@ -1,0 +1,9 @@
+# Keep secrets and build cruft out of the image build context.
+.git
+.env
+/bin
+/.cache
+/state
+/ansible
+/.github
+*.md

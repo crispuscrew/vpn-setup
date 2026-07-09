@@ -7,6 +7,7 @@
 # Prefer rootless Podman, fall back to Docker — never hardcode one.
 ENGINE := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 GO_IMAGE := docker.io/library/golang:1.24.10-alpine
+VPNBOT_IMAGE ?= vpn-setup/vpnbot:dev
 
 # Run a go command in the pinned container, repo mounted at /src. CGO off so the
 # binaries are static and run on the host (musl-built image, glibc host).
@@ -36,7 +37,10 @@ fmt:  ## Fail if any first-party Go file is not gofmt-formatted (vendor excluded
 
 lint: vet fmt  ## go vet + gofmt check
 
+image:  ## Build the vpnbot container image (VPNBOT_IMAGE to override the tag)
+	$(ENGINE) build -f cmd/vpnbot/Containerfile -t $(VPNBOT_IMAGE) .
+
 clean:  ## Remove build output and the go cache
 	rm -rf bin .cache
 
-.PHONY: help build run test vet fmt lint clean
+.PHONY: help build run test vet fmt lint image clean

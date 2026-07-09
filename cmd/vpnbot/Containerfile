@@ -1,0 +1,19 @@
+# Hermetic vendored build → minimal, non-root runtime.
+# Build from the repo root so the whole Go module (vendor/, cmd/, internal/) is in
+# context:  podman build -f cmd/vpnbot/Containerfile -t vpn-setup/vpnbot .
+FROM docker.io/library/golang:1.24.10-alpine AS build
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o /out/vpnbot ./cmd/vpnbot
+
+# CA roots for TLS to the Telegram API and the panel — the only thing the static
+# binary needs from a base system.
+FROM docker.io/library/alpine:3.21 AS certs
+RUN apk add --no-cache ca-certificates
+
+FROM scratch
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /out/vpnbot /usr/local/bin/vpnbot
+# Unprivileged; the delivery ledger persists under /state (mount a writable volume).
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/vpnbot"]
