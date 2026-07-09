@@ -1,0 +1,28 @@
+# Panel host plus one or more separate marznode hosts, all behind one panel.
+# The panel host runs the panel and an all-in-one node; each host in `nodes`
+# runs a marznode that the panel reaches over mutual TLS (grpclib + panel cert).
+# Copy to inventory/<name>.yml (real inventories are gitignored; only .example
+# files are tracked).
+#
+#   cp inventory/multi.yml.example inventory/multi.yml
+#   ansible-playbook site.yml -i inventory/multi.yml
+all:
+  children:
+    panel:
+      hosts:
+        vps:
+          ansible_host: "203.0.113.10"       # panel + all-in-one node
+    nodes:
+      hosts:
+        vps2:
+          ansible_host: "203.0.113.20"       # extra marznode; reachable from the panel
+        # vps3:
+        #   ansible_host: "203.0.113.30"
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: "~/.ssh/vpn-setup"
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
+
+    panel_domain: ""
+    # VLESS-Reality borrow target (see single.yml.example for guidance).
+    reality_sni: "dl.google.com"

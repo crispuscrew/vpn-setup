@@ -22,6 +22,7 @@ subscription_url_prefix: >-
      else ('http://' + ansible_host + ':' + (panel_port | string)) }}
 
 # ── Node (marznode) ───────────────────────────────────────────────────────────
+node_mode: local             # `local` = all-in-one w/ the panel; `nodes` group overrides to `remote`
 node_compose_dir: /opt/vpn-setup/node
 marznode_dir: /var/lib/marznode
 marznode_port: 53042         # panel ↔ marznode gRPC (secure, panel-cert authenticated)

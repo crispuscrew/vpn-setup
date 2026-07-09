@@ -1,9 +1,24 @@
-- name: Deploy the Marzneshin VPN stack
-  hosts: all
+# Panel host runs the panel plus an all-in-one (loopback) node; any hosts in the
+# `nodes` group run a marznode that connects back to the panel over mutual TLS.
+- name: Panel host — panel plus an all-in-one node
+  hosts: panel
   become: true
   vars_files:
     - "{{ playbook_dir }}/../versions.yml"
+  vars:
+    node_mode: local
   roles:
     - common
     - marzneshin_panel
+    - marznode
+
+- name: Node hosts — a marznode connected to the panel over TLS
+  hosts: nodes
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../versions.yml"
+  vars:
+    node_mode: remote
+  roles:
+    - common
     - marznode

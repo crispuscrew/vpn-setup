@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crispuscrew/vpn-setup/internal/panel"
+)
 
 func TestSameInts(t *testing.T) {
 	cases := []struct {
@@ -22,25 +26,31 @@ func TestSameInts(t *testing.T) {
 }
 
 func TestResolveInbounds(t *testing.T) {
-	idByTag := map[string]int{"VLESS_REALITY": 3, "HYSTERIA2": 1, "TROJAN": 2}
+	// Same tag "VLESS_REALITY" on two nodes (ids 3 and 4) must not collapse.
+	inbounds := []panel.Inbound{
+		{ID: 1, Tag: "HYSTERIA2"},
+		{ID: 2, Tag: "TROJAN"},
+		{ID: 3, Tag: "VLESS_REALITY"},
+		{ID: 4, Tag: "VLESS_REALITY"},
+	}
 
-	all, err := resolveInbounds(ServiceSpec{Name: "all", Inbounds: []string{"*"}}, idByTag)
+	all, err := resolveInbounds(ServiceSpec{Name: "all", Inbounds: []string{"*"}}, inbounds)
 	if err != nil {
 		t.Fatalf("wildcard: unexpected error: %v", err)
 	}
-	if !sameInts(all, []int{1, 2, 3}) {
-		t.Errorf("wildcard: got %v want sorted [1 2 3]", all)
+	if !sameInts(all, []int{1, 2, 3, 4}) {
+		t.Errorf("wildcard: got %v want [1 2 3 4] (must include both same-tag nodes)", all)
 	}
 
-	named, err := resolveInbounds(ServiceSpec{Name: "s", Inbounds: []string{"TROJAN", "VLESS_REALITY"}}, idByTag)
+	named, err := resolveInbounds(ServiceSpec{Name: "s", Inbounds: []string{"VLESS_REALITY"}}, inbounds)
 	if err != nil {
 		t.Fatalf("named: unexpected error: %v", err)
 	}
-	if !sameInts(named, []int{2, 3}) {
-		t.Errorf("named: got %v want [2 3]", named)
+	if !sameInts(named, []int{3, 4}) {
+		t.Errorf("named: got %v want [3 4] (both nodes' VLESS_REALITY)", named)
 	}
 
-	if _, err := resolveInbounds(ServiceSpec{Name: "s", Inbounds: []string{"NOPE"}}, idByTag); err == nil {
+	if _, err := resolveInbounds(ServiceSpec{Name: "s", Inbounds: []string{"NOPE"}}, inbounds); err == nil {
 		t.Error("unknown tag: expected an error, got nil")
 	}
 }

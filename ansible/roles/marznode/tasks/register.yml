@@ -1,0 +1,118 @@
+# Register this node with the panel (idempotently, matched by address) and wait for
+# it to report healthy. All panel API calls run on the panel host against its
+# loopback API, so the panel port never needs to be exposed off-box.
+- name: Resolve panel and node connection parameters
+  ansible.builtin.set_fact:
+    _panel_host: "{{ groups['panel'][0] }}"
+    _node_address: "{{ '127.0.0.1' if node_mode == 'local' else ansible_host }}"
+    _node_backend: "{{ 'grpcio' if node_mode == 'local' else 'grpclib' }}"
+    _node_name: "{{ node_name | default('local' if node_mode == 'local' else inventory_hostname) }}"
+
+- name: Authenticate to the panel
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/admins/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ panel_sudo_username }}"
+      password: "{{ hostvars[_panel_host].panel_sudo_password }}"
+  register: _tok
+  delegate_to: "{{ _panel_host }}"
+  no_log: true
+
+- name: List existing nodes
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _nodes
+  delegate_to: "{{ _panel_host }}"
+
+- name: Register this node if none targets its address
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ _node_name }}"
+      address: "{{ _node_address }}"
+      port: "{{ marznode_port | int }}"
+      connection_backend: "{{ _node_backend }}"
+      usage_coefficient: 1
+    status_code: [200, 409]
+  delegate_to: "{{ _panel_host }}"
+  when: (_nodes.json['items'] | selectattr('address', 'equalto', _node_address) | list | length) == 0
+
+- name: Re-list nodes and pick this one
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _nodes2
+  delegate_to: "{{ _panel_host }}"
+
+- name: Record this node's id
+  ansible.builtin.set_fact:
+    _node_id: "{{ (_nodes2.json['items'] | selectattr('address', 'equalto', _node_address) | map(attribute='id') | first) }}"
+
+# Modifying the node forces the panel to drop and re-open the channel, connecting
+# to the now-running marznode.
+- name: Force the panel to (re)connect the node
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _node_id }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ _node_name }}"
+      address: "{{ _node_address }}"
+      port: "{{ marznode_port | int }}"
+      connection_backend: "{{ _node_backend }}"
+      usage_coefficient: 1
+  delegate_to: "{{ _panel_host }}"
+
+- name: Wait for the node to become healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _node_id }}"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _node_status
+  retries: 24
+  delay: 5
+  until: _node_status.json.status == 'healthy'
+  delegate_to: "{{ _panel_host }}"
+
+- name: Show node status + discovered backends
+  ansible.builtin.debug:
+    msg: >-
+      node '{{ _node_status.json.name }}' ({{ _node_address }}, {{ _node_backend }})
+      is {{ _node_status.json.status }};
+      backends={{ _node_status.json.backends | map(attribute='name') | list }}
+
+# A default host uses {SERVER_IP}, which resolves to the panel's address for every
+# node — wrong for a separate node host. Point each of this node's hosts at the
+# node's own public address so multi-node subscriptions reach the right box.
+- name: List inbound hosts
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts"
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+  register: _hosts
+  delegate_to: "{{ _panel_host }}"
+
+- name: Point this node's hosts at its public address
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts/{{ item.id }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _tok.json.access_token }}"
+    body_format: json
+    body: "{{ item | combine({'address': ansible_host}) }}"
+  loop: "{{ _hosts.json['items'] | selectattr('inbound_id', 'in', _node_status.json.inbound_ids | default([])) | list }}"
+  loop_control:
+    label: "host {{ item.id }} -> {{ ansible_host }}"
+  delegate_to: "{{ _panel_host }}"
+  when: item.address != ansible_host
