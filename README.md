@@ -54,6 +54,11 @@ cp ansible/inventory/single.yml.example ansible/inventory/<name>.yml   # set hos
 ansible-playbook ansible/site.yml -i ansible/inventory/<name>.yml
 ```
 
+For extra nodes behind the same panel, use `multi.yml.example` — a `panel` host
+plus a `nodes` group. The panel host runs the panel and an all-in-one node; each
+`nodes` host runs a marznode that the panel reaches over mutual TLS (grpclib +
+the panel's client certificate), and a user's subscription spans every node.
+
 ## Operate
 
 `vpn` drives the panel as config-as-code. It reads the panel URL and sudo-admin

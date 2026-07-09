@@ -1,5 +1,6 @@
-# Bring up marznode all-in-one (loopback/INSECURE) with a VLESS-Reality inbound,
-# then make the panel's local node connect and verify it is healthy.
+# Bring up a marznode and make the panel connect to it. In `local` mode the node is
+# co-located with the panel (loopback, grpcio, INSECURE); in `remote` mode it runs
+# on its own host and the panel reaches it over mutual TLS (grpclib + panel cert).
 - name: Ensure node directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -75,6 +76,12 @@
   changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
   notify: reload firewalld
 
+# ── Remote nodes need the gRPC port opened and the panel cert in place before
+#    marznode starts (it exits if the client cert is missing) ──────────────────
+- name: Prepare secure connectivity for a remote node
+  ansible.builtin.include_tasks: remote_prep.yml
+  when: node_mode == 'remote'
+
 - name: Start marznode
   ansible.builtin.command:
     cmd: docker compose up -d
@@ -87,78 +94,5 @@
 - name: Apply any pending restart before health-checking
   ansible.builtin.meta: flush_handlers
 
-# ── Register (if needed) and verify the panel↔node link ──────────────────────
-- name: Authenticate to the panel
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/admins/token"
-    method: POST
-    body_format: form-urlencoded
-    body:
-      username: "{{ panel_sudo_username }}"
-      password: "{{ panel_sudo_password }}"
-  register: _tok
-  no_log: true
-
-- name: List existing nodes
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
-    headers:
-      Authorization: "Bearer {{ _tok.json.access_token }}"
-  register: _nodes
-
-- name: Register the local node if none targets 127.0.0.1
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
-    method: POST
-    headers:
-      Authorization: "Bearer {{ _tok.json.access_token }}"
-    body_format: json
-    body:
-      name: local
-      address: 127.0.0.1
-      port: "{{ marznode_port | int }}"
-      connection_backend: grpcio
-      usage_coefficient: 1
-    status_code: [200, 409]
-  when: (_nodes.json['items'] | selectattr('address', 'equalto', '127.0.0.1') | list | length) == 0
-
-- name: Re-list nodes and pick the local one
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
-    headers:
-      Authorization: "Bearer {{ _tok.json.access_token }}"
-  register: _nodes2
-
-- name: Record the local node id
-  ansible.builtin.set_fact:
-    _local_node_id: "{{ (_nodes2.json['items'] | selectattr('address', 'equalto', '127.0.0.1') | map(attribute='id') | first) }}"
-
-# A fresh channel was opened while marznode was down; modifying the node forces
-# the panel to drop and re-add it, connecting to the now-running node.
-- name: Force the panel to (re)connect the node
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _local_node_id }}"
-    method: PUT
-    headers:
-      Authorization: "Bearer {{ _tok.json.access_token }}"
-    body_format: json
-    body:
-      name: local
-      address: 127.0.0.1
-      port: "{{ marznode_port | int }}"
-      connection_backend: grpcio
-      usage_coefficient: 1
-
-- name: Wait for the node to become healthy
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/{{ _local_node_id }}"
-    headers:
-      Authorization: "Bearer {{ _tok.json.access_token }}"
-  register: _node_status
-  retries: 24
-  delay: 5
-  until: _node_status.json.status == 'healthy'
-
-- name: Show node status + discovered backends
-  ansible.builtin.debug:
-    msg: "node '{{ _node_status.json.name }}' is {{ _node_status.json.status }}; backends={{ _node_status.json.backends | map(attribute='name') | list }}"
+- name: Register the node with the panel and verify it is healthy
+  ansible.builtin.include_tasks: register.yml

@@ -27,47 +27,45 @@ func runApply(args []string) error {
 		return err
 	}
 
-	inboundIDByTag, err := inboundIndex(ctx, client)
+	inbounds, err := client.Inbounds(ctx)
 	if err != nil {
 		return err
 	}
-	serviceIDByName, err := applyServices(ctx, client, cfg.Services, inboundIDByTag)
+	serviceIDByName, err := applyServices(ctx, client, cfg.Services, inbounds)
 	if err != nil {
 		return err
 	}
 	return applyUsers(ctx, client, cfg.Users, serviceIDByName)
 }
 
-// inboundIndex maps each discovered inbound tag to its id.
-func inboundIndex(ctx context.Context, client *panel.Client) (map[string]int, error) {
-	inbounds, err := client.Inbounds(ctx)
-	if err != nil {
-		return nil, err
-	}
-	index := make(map[string]int, len(inbounds))
-	for _, inbound := range inbounds {
-		index[inbound.Tag] = inbound.ID
-	}
-	return index, nil
-}
-
-// resolveInbounds turns a spec's inbound tags (or "*") into a sorted id list.
-func resolveInbounds(spec ServiceSpec, idByTag map[string]int) ([]int, error) {
+// resolveInbounds turns a spec's inbound tags (or "*") into a sorted id list. A tag
+// can match several inbounds when the same protocol runs on multiple nodes, so
+// every matching inbound id is included (not just one per tag).
+func resolveInbounds(spec ServiceSpec, inbounds []panel.Inbound) ([]int, error) {
 	if len(spec.Inbounds) == 1 && spec.Inbounds[0] == "*" {
-		ids := make([]int, 0, len(idByTag))
-		for _, id := range idByTag {
-			ids = append(ids, id)
+		ids := make([]int, 0, len(inbounds))
+		for _, inbound := range inbounds {
+			ids = append(ids, inbound.ID)
 		}
 		sort.Ints(ids)
 		return ids, nil
 	}
-	ids := make([]int, 0, len(spec.Inbounds))
+	wanted := make(map[string]bool, len(spec.Inbounds))
 	for _, tag := range spec.Inbounds {
-		id, ok := idByTag[tag]
-		if !ok {
+		wanted[tag] = true
+	}
+	seen := make(map[string]bool, len(spec.Inbounds))
+	ids := make([]int, 0, len(inbounds))
+	for _, inbound := range inbounds {
+		if wanted[inbound.Tag] {
+			ids = append(ids, inbound.ID)
+			seen[inbound.Tag] = true
+		}
+	}
+	for tag := range wanted {
+		if !seen[tag] {
 			return nil, fmt.Errorf("service %q: no inbound tagged %q on any node", spec.Name, tag)
 		}
-		ids = append(ids, id)
 	}
 	sort.Ints(ids)
 	return ids, nil
@@ -75,7 +73,7 @@ func resolveInbounds(spec ServiceSpec, idByTag map[string]int) ([]int, error) {
 
 // applyServices reconciles declared services and returns every service name→id,
 // so users may reference services declared here or pre-existing on the panel.
-func applyServices(ctx context.Context, client *panel.Client, specs []ServiceSpec, idByTag map[string]int) (map[string]int, error) {
+func applyServices(ctx context.Context, client *panel.Client, specs []ServiceSpec, inbounds []panel.Inbound) (map[string]int, error) {
 	existing, err := client.Services(ctx)
 	if err != nil {
 		return nil, err
@@ -88,7 +86,7 @@ func applyServices(ctx context.Context, client *panel.Client, specs []ServiceSpe
 	}
 
 	for _, spec := range specs {
-		want, err := resolveInbounds(spec, idByTag)
+		want, err := resolveInbounds(spec, inbounds)
 		if err != nil {
 			return nil, err
 		}

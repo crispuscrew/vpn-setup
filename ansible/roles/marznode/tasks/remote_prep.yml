@@ -1,0 +1,35 @@
+# Runs on a remote node before marznode starts: open the gRPC port to the panel
+# only, and install the panel's client certificate so marznode can authenticate it.
+- name: Allow only the panel to reach the node's gRPC port
+  ansible.posix.firewalld:
+    rich_rule: 'rule family="ipv4" source address="{{ hostvars[groups["panel"][0]].ansible_host }}" port port="{{ marznode_port }}" protocol="tcp" accept'
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Authenticate to the panel (to fetch the node certificate)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/admins/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ panel_sudo_username }}"
+      password: "{{ hostvars[groups['panel'][0]].panel_sudo_password }}"
+  register: _cert_tok
+  delegate_to: "{{ groups['panel'][0] }}"
+  no_log: true
+
+- name: Fetch the panel client certificate
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes/settings"
+    headers:
+      Authorization: "Bearer {{ _cert_tok.json.access_token }}"
+  register: _node_settings
+  delegate_to: "{{ groups['panel'][0] }}"
+
+- name: Install the panel client certificate on the node
+  ansible.builtin.copy:
+    dest: "{{ marznode_dir }}/client.pem"
+    content: "{{ _node_settings.json.certificate }}"
+    mode: "0600"
+  notify: restart marznode
