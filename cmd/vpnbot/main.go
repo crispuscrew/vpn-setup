@@ -5,8 +5,7 @@
 //
 // All secrets come from the environment, never files: VPNBOT_TOKEN (from BotFather),
 // VPNBOT_ADMINS (comma-separated Telegram user ids), and the VPN_PANEL_* credentials
-// the panel client reads. Optional: VPNBOT_LEDGER (default /state/ledger.json),
-// VPNBOT_DEFAULT_SERVICE (default "all").
+// the panel client reads. Optional: VPNBOT_LEDGER (default /state/ledger.json).
 package main
 
 import (
@@ -73,10 +72,9 @@ func run() error {
 	}
 
 	application := &app{
-		ledger:         led,
-		admins:         admins,
-		defaultService: envOr("VPNBOT_DEFAULT_SERVICE", "all"),
-		botUsername:    bot.Me.Username,
+		ledger:      led,
+		admins:      admins,
+		botUsername: bot.Me.Username,
 	}
 	bot.Handle("/start", application.onStart)
 	bot.Handle("/setup", application.onSetup)
@@ -85,6 +83,8 @@ func run() error {
 	bot.Handle("/list", application.onList)
 	bot.Handle("/revoke", application.onRevoke)
 	bot.Handle(&setupBtn, application.onSetupPick)
+	bot.Handle(&addLocBtn, application.onAddToggle)
+	bot.Handle(&addDoneBtn, application.onAddDone)
 
 	// Advertise the user-facing commands in Telegram's "/" menu; admin commands
 	// stay unlisted (they answer "Not authorised." for everyone else).
@@ -135,7 +135,7 @@ func envOr(key, fallback string) string {
 }
 
 func usage() {
-	fmt.Print(`vpnbot — Telegram subscription-delivery bot for vpn-setup
+	fmt.Print(`vpnbot - Telegram subscription-delivery bot for vpn-setup
 
 usage:
   vpnbot            run the delivery daemon (long-polls Telegram)
@@ -148,6 +148,5 @@ required environment:
   VPN_PANEL_URL/USERNAME/PASSWORD   panel API credentials
 optional environment:
   VPNBOT_LEDGER             delivery ledger path (default /state/ledger.json)
-  VPNBOT_DEFAULT_SERVICE    service granted to new users (default "all")
 `)
 }

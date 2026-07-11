@@ -104,6 +104,18 @@ func (l *Ledger) Claim(token string, chatID int64) (Entry, bool, error) {
 	return Entry{}, false, ErrNotFound
 }
 
+// ByUsername returns the entry tracked for a panel username, if any.
+func (l *Ledger) ByUsername(username string) (Entry, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, entry := range l.data.Entries {
+		if entry.Username == username {
+			return entry, true
+		}
+	}
+	return Entry{}, false
+}
+
 // ByChat returns the entry a chat has already claimed, if any.
 func (l *Ledger) ByChat(chatID int64) (Entry, bool) {
 	l.mu.Lock()

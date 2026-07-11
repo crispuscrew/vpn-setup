@@ -22,10 +22,9 @@ const (
 
 // app holds the bot's dependencies; handlers are methods on it.
 type app struct {
-	ledger         *ledger.Ledger
-	admins         map[int64]bool
-	defaultService string
-	botUsername    string
+	ledger      *ledger.Ledger
+	admins      map[int64]bool
+	botUsername string
 }
 
 func (a *app) isAdmin(c tele.Context) bool {
@@ -48,7 +47,7 @@ func (a *app) deliver(c tele.Context, username string) error {
 
 	client, err := panel.FromEnv(ctx)
 	if err != nil {
-		return c.Send("The panel is unavailable right now — please try again later.")
+		return c.Send("The panel is unavailable right now - please try again later.")
 	}
 	user, err := client.User(ctx, username)
 	if err != nil {
