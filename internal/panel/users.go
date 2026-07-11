@@ -27,8 +27,9 @@ type userCreate struct {
 }
 
 type userModify struct {
-	ServiceIDs     []int  `json:"service_ids,omitempty"`
-	ExpireStrategy string `json:"expire_strategy,omitempty"`
+	Username       string `json:"username"`
+	ServiceIDs     []int  `json:"service_ids"`
+	ExpireStrategy string `json:"expire_strategy"`
 }
 
 // Users lists all users.
@@ -55,25 +56,10 @@ func (c *Client) CreateUser(ctx context.Context, username, expireStrategy string
 	return &out, nil
 }
 
-// UpdateUser changes a user's services and expire strategy.
+// UpdateUser replaces a user's services and expire strategy. The panel PUT is a
+// full replace: it requires the username in the body and takes the service list
+// verbatim, so an empty list clears every service.
 func (c *Client) UpdateUser(ctx context.Context, username, expireStrategy string, serviceIDs []int) (*User, error) {
-	var out User
-	body := userModify{ServiceIDs: serviceIDs, ExpireStrategy: expireStrategy}
-	if err := c.do(ctx, http.MethodPut, "/api/users/"+username, body, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-type userServices struct {
-	ServiceIDs     []int  `json:"service_ids"`
-	ExpireStrategy string `json:"expire_strategy"`
-}
-
-// SetServices replaces a user's granted services. Unlike UpdateUser it sends the
-// list explicitly, so an empty slice clears every service (an empty list is
-// omitted by UpdateUser). Used by the bot's per-location grant toggle.
-func (c *Client) SetServices(ctx context.Context, username, expireStrategy string, serviceIDs []int) (*User, error) {
 	if serviceIDs == nil {
 		serviceIDs = []int{}
 	}
@@ -81,7 +67,7 @@ func (c *Client) SetServices(ctx context.Context, username, expireStrategy strin
 		expireStrategy = ExpireNever
 	}
 	var out User
-	body := userServices{ServiceIDs: serviceIDs, ExpireStrategy: expireStrategy}
+	body := userModify{Username: username, ServiceIDs: serviceIDs, ExpireStrategy: expireStrategy}
 	if err := c.do(ctx, http.MethodPut, "/api/users/"+username, body, &out); err != nil {
 		return nil, err
 	}

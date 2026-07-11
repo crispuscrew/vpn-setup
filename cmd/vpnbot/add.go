@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -121,7 +122,8 @@ func (a *app) onAddToggle(c tele.Context) error {
 		return c.Respond(&tele.CallbackResponse{Text: "No such user"})
 	}
 	next, added := toggleID(user.ServiceIDs, serviceID)
-	if _, err := client.SetServices(ctx, username, user.ExpireStrategy, next); err != nil {
+	if _, err := client.UpdateUser(ctx, username, user.ExpireStrategy, next); err != nil {
+		log.Printf("add toggle %s service %d: %v", username, serviceID, err)
 		return c.Respond(&tele.CallbackResponse{Text: "Update failed"})
 	}
 
