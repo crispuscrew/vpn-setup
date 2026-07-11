@@ -1,0 +1,24 @@
+# vpnbot: the Telegram delivery bot, run as a container on the panel host so
+# delivery no longer depends on an operator's machine. Opt-in per host.
+vpnbot_enabled: false
+
+vpnbot_compose_dir: /opt/vpn-setup/vpnbot
+vpnbot_build_dir: /opt/vpn-setup/vpnbot/build
+vpnbot_state_dir: /var/lib/vpnbot          # holds the delivery ledger (persistent)
+vpnbot_image: "vpn-setup/vpnbot:local"
+
+# Source for the image build (the repo is public); pin to a tag for a release.
+vpnbot_repo: "https://github.com/crispuscrew/vpn-setup.git"
+vpnbot_ref: main
+
+# The image runs as this non-root uid (see cmd/vpnbot/Containerfile); the state dir
+# and the mounted SSH key must be readable/writable by it.
+vpnbot_uid: 65532
+
+# Admin Telegram user ids (comma-separated). Set in the inventory.
+vpnbot_admins: ""
+
+# Node-side peer-agent path the bot invokes over SSH. Tracks the amneziawg role's
+# awg_peer_script when that role is in scope (the panel play runs both), with a
+# literal fallback so the vpnbot role also works run on its own.
+vpnbot_awg_script: "{{ awg_peer_script | default('/usr/local/sbin/awg-peer') }}"

@@ -1,0 +1,82 @@
+# Build and run the vpnbot container on the panel host. It reaches the panel over
+# the host loopback and the AWG nodes over SSH with a key each node restricts to the
+# awg-peer command (see the amneziawg role).
+- name: Ensure vpnbot directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ vpnbot_compose_dir }}"
+    - "{{ vpnbot_build_dir }}"
+
+- name: Ensure the ledger dir is writable by the container uid
+  ansible.builtin.file:
+    path: "{{ vpnbot_state_dir }}"
+    state: directory
+    owner: "{{ vpnbot_uid }}"
+    group: "{{ vpnbot_uid }}"
+    mode: "0700"
+
+- name: Install git for the source build
+  ansible.builtin.package:
+    name: git
+    state: present
+
+- name: Fetch the source at the pinned ref
+  ansible.builtin.git:
+    repo: "{{ vpnbot_repo }}"
+    dest: "{{ vpnbot_build_dir }}"
+    version: "{{ vpnbot_ref }}"
+    force: true
+  register: _vpnbot_src
+
+- name: Build the vpnbot image
+  ansible.builtin.command:
+    cmd: "docker build -f cmd/vpnbot/Containerfile -t {{ vpnbot_image }} ."
+    chdir: "{{ vpnbot_build_dir }}"
+  register: _vpnbot_build
+  changed_when: "'Writing image' in _vpnbot_build.stderr or 'naming to' in _vpnbot_build.stderr or _vpnbot_src.changed"
+  notify: restart vpnbot
+
+- name: Install the restricted SSH key for the node peer agents
+  ansible.builtin.copy:
+    src: "{{ vpnbot_ssh_key_path }}"
+    dest: "{{ vpnbot_compose_dir }}/awg_ssh_key"
+    owner: "{{ vpnbot_uid }}"
+    group: "{{ vpnbot_uid }}"
+    mode: "0600"
+  notify: restart vpnbot
+
+- name: Render the vpnbot env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ vpnbot_compose_dir }}/.env"
+    mode: "0600"
+  notify: restart vpnbot
+
+- name: Render the vpnbot compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ vpnbot_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start vpnbot
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ vpnbot_compose_dir }}"
+  register: _vpnbot_up
+  changed_when: >-
+    ('Started' in _vpnbot_up.stderr) or ('Created' in _vpnbot_up.stderr)
+    or ('Recreated' in _vpnbot_up.stderr)
+
+- name: Apply any pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Confirm the bot container is running
+  ansible.builtin.command: "docker inspect -f '{{ '{{' }}.State.Status{{ '}}' }}' vpnbot"
+  register: _vpnbot_state
+  retries: 5
+  delay: 3
+  until: _vpnbot_state.stdout == 'running'
+  changed_when: false

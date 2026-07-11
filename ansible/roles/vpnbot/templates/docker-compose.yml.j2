@@ -1,0 +1,14 @@
+# Managed by Ansible (vpn-setup). vpnbot delivery bot, built from source on this
+# host. Host-networked so it reaches the panel on loopback and the nodes over SSH;
+# it binds no ports itself. Non-root (uid from the image). The ledger persists in
+# /state; the restricted SSH key is mounted read-only.
+services:
+  vpnbot:
+    image: {{ vpnbot_image }}
+    container_name: vpnbot
+    restart: always
+    env_file: .env
+    network_mode: host
+    volumes:
+      - {{ vpnbot_state_dir }}:/state
+      - {{ vpnbot_compose_dir }}/awg_ssh_key:/awg_ssh_key:ro

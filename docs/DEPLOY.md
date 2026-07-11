@@ -153,12 +153,30 @@ the newly discovered inbounds.
 Create a bot with @BotFather for the token, and get your numeric Telegram id (for
 example from @userinfobot) for the admin allowlist.
 
+The recommended path runs the bot as a container on the panel host, managed by the
+same playbook, so delivery no longer depends on an operator's laptop. Put the token
+in a gitignored secret file on the control node and opt the panel host in:
+
 ```
-make image     # builds the small non-root vpnbot container
+printf '%s' '<botfather-token>' > ansible/.secrets/vpnbot_token.txt
 ```
 
-Run the container with these set (plus a writable volume at `/state` for the
-delivery ledger):
+```yaml
+# inventory, on the panel host
+vpnbot_enabled: true
+vpnbot_admins: "123456789"      # comma-separated admin Telegram ids
+```
+
+Re-run the playbook. The `vpnbot` role builds the small non-root image from source
+on the host, then runs it host-networked so it reaches the panel over loopback
+(`http://127.0.0.1:{{ panel_port }}`, no public port, no TLS hop) and the AWG nodes
+over SSH. The panel credentials and `VPNBOT_AWG_NODES` are wired from the inventory;
+the delivery ledger persists in `/var/lib/vpnbot`. For AWG the playbook mints a
+dedicated bot key and authorises it on each node restricted to the peer agent (see
+step 7), so a bot compromise cannot get a shell.
+
+To run the bot off-host instead (for example on a laptop while testing), build the
+container with `make image` and run it with a writable `/state` volume and these set:
 
 - `VPNBOT_TOKEN` bot token from @BotFather.
 - `VPNBOT_ADMINS` comma-separated admin Telegram user ids.
@@ -186,14 +204,20 @@ Re-run the playbook; the `amneziawg` role builds the pinned server image, genera
 per-node obfuscation profile, brings up `awg0`, and installs a node-side `awg-peer`
 agent the bot drives over SSH.
 
-To let the bot hand out peers, set on the bot:
+When the bot runs on the panel host (step 6), this is wired automatically: the
+playbook mints a dedicated bot SSH key, authorises it on each AWG node restricted to
+the peer agent with a forced command (a bot compromise can only manage peers, never
+get a shell), and passes the node list and key into the container. Nothing to set by
+hand.
+
+Running the bot off-host, set instead:
 
 - `VPNBOT_AWG_NODES` - `Location=host` pairs, one per AWG node, e.g.
   `Estonia=203.0.113.1,Serbia=203.0.113.2`. The location must match the panel
   service/node name.
 - `VPNBOT_SSH_KEY` (default `~/.ssh/amnezia-ansible`), `VPNBOT_SSH_USER` (default
-  `root`) - how the bot reaches the node agents. Reuses the deploy key; the bot must
-  run on a host that can SSH to the nodes.
+  `root`) - how the bot reaches the node agents. The bot must run on a host that can
+  SSH to the nodes.
 
 A user runs `/awg`, picks one of their granted locations, and receives an importable
 `.conf` plus a QR. Only a location the user is granted and that has an AWG node
