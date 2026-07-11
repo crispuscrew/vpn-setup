@@ -18,6 +18,10 @@ services:
     nodes: ["Estonia"]
   - name: Russia
     nodes: ["Russia"]
+  - name: Serbia
+    nodes: ["Serbia"]
+  - name: USA
+    nodes: ["USA"]
 
 users:
   - username: testuser

@@ -92,20 +92,31 @@ export VPN_PANEL_PASSWORD="$(cat ansible/.secrets/panel_admin_<host>.txt)"
 ## 5. Add another node
 
 Use the multi-node inventory: a `panel` host plus a `nodes` group. Give each host a
-distinct `node_label` so the several servers a subscription spans are told apart in
-the client's server list.
+`location` (for example "Serbia"); it names the panel node and, with an optional
+`node_label` like "🇷🇸 Serbia", the name users see in their client. Extra nodes may
+run Debian or Alma; the panel host stays Alma.
 
 ```
 cp ansible/inventory/multi.yml.example ansible/inventory/prod.yml
-# set ansible_host and node_label for the panel host and each node, then:
+# set ansible_host + location (and node_label) per host, then:
 ansible-playbook ansible/site.yml -i ansible/inventory/prod.yml
 ```
 
 The panel opens the node's gRPC port to itself only, fetches its own client
 certificate, and connects over mutual TLS; the node's subscription host is pointed
 at the node's own public address. Re-run `./bin/vpn status` and confirm the new
-node's inbound appears. No change to `vpn.yaml` is needed: the `all` service already
-grabs every inbound.
+node's inbound appears.
+
+To let users pick this location, add a per-location service to `vpn.yaml` and
+re-apply:
+
+```
+  - name: Serbia
+    nodes: ["Serbia"]     # every inbound on the node named Serbia
+```
+
+The `all` service (`inbounds: ["*"]`) always spans every node; per-location services
+scope a user to one node. The bot's `/add` picker grants any subset of these.
 
 ## 6. Run the delivery bot
 
@@ -122,12 +133,12 @@ delivery ledger):
 - `VPNBOT_TOKEN` bot token from @BotFather.
 - `VPNBOT_ADMINS` comma-separated admin Telegram user ids.
 - `VPN_PANEL_URL`, `VPN_PANEL_USERNAME`, `VPN_PANEL_PASSWORD` as in step 4.
-- Optional `VPNBOT_LEDGER` (default `/state/ledger.json`) and
-  `VPNBOT_DEFAULT_SERVICE` (default `all`).
+- Optional `VPNBOT_LEDGER` (default `/state/ledger.json`).
 
-An admin runs `/add <username>` to create a panel user and get a one-time claim
-link; the recipient taps it and receives their subscription URL and QR once, with a
-`/setup` device guide. `/list`, `/revoke`, and `/help` round out the admin face.
+An admin runs `/add <username>`, taps the locations that user may reach, then Done
+to get a one-time claim link; the recipient taps it and receives their subscription
+URL and QR once, with a `/setup` device guide. `/list`, `/revoke`, and `/help` round
+out the admin face.
 
 ## Security
 
