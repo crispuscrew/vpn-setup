@@ -1,0 +1,26 @@
+# Debian has no host firewall configured by default. Use ufw, and allow SSH FIRST
+# so enabling the firewall can never lock us out. Then the Reality port; the gRPC
+# port from the panel is opened later, in remote_prep.yml, for remote nodes only.
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+
+- name: Allow SSH before enabling the firewall
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Allow the Reality port
+  community.general.ufw:
+    rule: allow
+    port: "{{ reality_port }}"
+    proto: tcp
+
+- name: Enable ufw (default deny incoming, allow outgoing)
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming

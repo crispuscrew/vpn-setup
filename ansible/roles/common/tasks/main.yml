@@ -1,11 +1,11 @@
 # Host bootstrap: swap (safety on small VPS) + the Docker engine for the
-# Marzneshin stack. Phase 1 targets RHEL/AlmaLinux; other families are added when
-# there is a box to test them on.
+# Marzneshin stack. Supports RHEL/AlmaLinux and Debian; the panel host is RHEL,
+# extra nodes may be either.
 - name: Assert a supported OS family
   ansible.builtin.assert:
-    that: ansible_os_family == 'RedHat'
+    that: ansible_os_family in ['RedHat', 'Debian']
     fail_msg: >-
-      Host bootstrap is implemented for RedHat/AlmaLinux only so far;
+      Host bootstrap supports RedHat/AlmaLinux and Debian;
       this host is {{ ansible_os_family }}.
 
 - name: Ensure swap is present
@@ -13,4 +13,5 @@
   when: swap_size_mb | int > 0
 
 - name: Install the Docker engine
-  ansible.builtin.include_tasks: docker_redhat.yml
+  ansible.builtin.include_tasks:
+    file: "docker_{{ 'debian' if ansible_os_family == 'Debian' else 'redhat' }}.yml"
