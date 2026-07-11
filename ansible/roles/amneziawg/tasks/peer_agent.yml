@@ -1,0 +1,10 @@
+# Install the node-side peer agent the vpnbot drives over SSH. It only reads the
+# server identity and edits awg0.conf + the live interface; it opens no port and
+# runs no daemon, so it adds nothing to the node's attack surface.
+- name: Install the awg-peer agent
+  ansible.builtin.template:
+    src: awg-peer.sh.j2
+    dest: "{{ awg_peer_script }}"
+    mode: "0750"
+    owner: root
+    group: root

@@ -11,6 +11,7 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 	tele "gopkg.in/telebot.v3"
 
+	"github.com/crispuscrew/vpn-setup/internal/awg"
 	"github.com/crispuscrew/vpn-setup/internal/ledger"
 	"github.com/crispuscrew/vpn-setup/internal/panel"
 )
@@ -26,6 +27,11 @@ type app struct {
 	ledger      *ledger.Ledger
 	admins      map[int64]bool
 	botUsername string
+	// awgNodes maps a location (panel service/node name) to that node's public
+	// host; awgAgent runs the node-side peer agent over SSH. Both empty when
+	// AmneziaWG delivery is not configured.
+	awgNodes map[string]string
+	awgAgent *awg.NodeAgent
 }
 
 func (a *app) isAdmin(c tele.Context) bool {

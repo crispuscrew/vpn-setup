@@ -156,6 +156,36 @@ to get a one-time claim link; the recipient taps it and receives their subscript
 URL and QR once, with a `/setup` device guide. `/list`, `/revoke`, and `/help` round
 out the admin face.
 
+## 7. AmneziaWG (optional)
+
+AmneziaWG is an obfuscated-WireGuard protocol that cannot ride the Marzneshin
+subscription, so it runs as a standalone userspace server per node and is delivered
+out of band as a `.conf` the AmneziaVPN app imports.
+
+Enable the server per host in the inventory:
+
+```
+awg_enabled: true    # stands up the amneziawg server on this host (51820/udp)
+```
+
+Re-run the playbook; the `amneziawg` role builds the pinned server image, generates a
+per-node obfuscation profile, brings up `awg0`, and installs a node-side `awg-peer`
+agent the bot drives over SSH.
+
+To let the bot hand out peers, set on the bot:
+
+- `VPNBOT_AWG_NODES` - `Location=host` pairs, one per AWG node, e.g.
+  `Estonia=203.0.113.1,Serbia=203.0.113.2`. The location must match the panel
+  service/node name.
+- `VPNBOT_SSH_KEY` (default `~/.ssh/amnezia-ansible`), `VPNBOT_SSH_USER` (default
+  `root`) - how the bot reaches the node agents. Reuses the deploy key; the bot must
+  run on a host that can SSH to the nodes.
+
+A user runs `/awg`, picks one of their granted locations, and receives an importable
+`.conf` plus a QR. Only a location the user is granted and that has an AWG node
+configured is offered, so per-location access still applies. Peers are recorded so a
+repeat `/awg` re-sends the same config.
+
 ## Security
 
 - Never commit secrets. The bot token, panel admin password

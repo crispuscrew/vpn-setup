@@ -48,47 +48,56 @@ func tr(l lang) msg {
 // msg is every user-facing string, one instance per language. Fields ending in a
 // verb-like name carry %s/%d placeholders filled with fmt.Sprintf.
 type msg struct {
-	welcome         string
-	codeInvalid     string
-	codeClaimed     string
-	helpUser        string
-	helpAdmin       string
-	notAuthorised   string
-	panelDown       string
-	panelShort      string
-	listEmpty       string
-	listHeader      string
-	listUnclaimed   string
-	listDelivered   string // takes chat id
-	listLine        string // takes name, status
-	revokeUsage     string
-	revokeNoUser    string // takes username
-	revokeFailed    string // takes error
-	revokeOK        string // takes username
-	accountNotFound string
-	deliverCaption  string // takes subscription URL
-	setupChoose     string
-	unknownPlatform string
-	subLinkPrefix   string // takes link
-	multiServerNote string
-	steps           map[string]string
-	addUsage        string
-	addCreateFail   string // takes error
-	addGrantPrompt  string // takes username
-	addBadRequest   string
-	addNoUser       string
-	addUpdateFail   string
-	addGranted      string
-	addRemoved      string
-	addPickFirst    string
-	addDone         string // takes username, locations, link, code
-	btnDone         string
-	chooseLang      string
-	langSet         string
-	cmdStart        string
-	cmdSetup        string
-	cmdHelp         string
-	cmdLang         string
+	welcome          string
+	codeInvalid      string
+	codeClaimed      string
+	helpUser         string
+	helpAdmin        string
+	notAuthorised    string
+	panelDown        string
+	panelShort       string
+	listEmpty        string
+	listHeader       string
+	listUnclaimed    string
+	listDelivered    string // takes chat id
+	listLine         string // takes name, status
+	revokeUsage      string
+	revokeNoUser     string // takes username
+	revokeFailed     string // takes error
+	revokeOK         string // takes username
+	accountNotFound  string
+	deliverCaption   string // takes subscription URL
+	setupChoose      string
+	unknownPlatform  string
+	subLinkPrefix    string // takes link
+	multiServerNote  string
+	steps            map[string]string
+	addUsage         string
+	addCreateFail    string // takes error
+	addGrantPrompt   string // takes username
+	addBadRequest    string
+	addNoUser        string
+	addUpdateFail    string
+	addGranted       string
+	addRemoved       string
+	addPickFirst     string
+	addDone          string // takes username, locations, link, code
+	btnDone          string
+	chooseLang       string
+	langSet          string
+	awgNotConfigured string
+	awgClaimFirst    string
+	awgNoLocations   string
+	awgChoose        string
+	awgProvisioning  string
+	awgFailed        string
+	awgCaption       string // takes location
+	awgQRCaption     string
+	cmdStart         string
+	cmdSetup         string
+	cmdHelp          string
+	cmdLang          string
+	cmdAwg           string
 }
 
 var catalog = map[lang]msg{

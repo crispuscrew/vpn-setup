@@ -12,12 +12,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	tele "gopkg.in/telebot.v3"
 
+	"github.com/crispuscrew/vpn-setup/internal/awg"
 	"github.com/crispuscrew/vpn-setup/internal/buildinfo"
 	"github.com/crispuscrew/vpn-setup/internal/ledger"
 )
@@ -56,6 +58,14 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
 	}
+	awgNodes, err := parseAWGNodes(os.Getenv("VPNBOT_AWG_NODES"))
+	if err != nil {
+		return err
+	}
+	var awgAgent *awg.NodeAgent
+	if len(awgNodes) > 0 {
+		awgAgent = awg.NewNodeAgent(awgKeyPath(), os.Getenv("VPNBOT_SSH_USER"), os.Getenv("VPNBOT_AWG_SCRIPT"))
+	}
 
 	bot, err := tele.NewBot(tele.Settings{
 		Token: token,
@@ -75,11 +85,14 @@ func run() error {
 		ledger:      led,
 		admins:      admins,
 		botUsername: bot.Me.Username,
+		awgNodes:    awgNodes,
+		awgAgent:    awgAgent,
 	}
 	bot.Handle("/start", application.onStart)
 	bot.Handle("/setup", application.onSetup)
 	bot.Handle("/lang", application.onLang)
 	bot.Handle("/help", application.onHelp)
+	bot.Handle("/awg", application.onAWG)
 	bot.Handle("/add", application.onAdd)
 	bot.Handle("/list", application.onList)
 	bot.Handle("/revoke", application.onRevoke)
@@ -87,18 +100,24 @@ func run() error {
 	bot.Handle(&langBtn, application.onLangPick)
 	bot.Handle(&addLocBtn, application.onAddToggle)
 	bot.Handle(&addDoneBtn, application.onAddDone)
+	bot.Handle(&awgLocBtn, application.onAWGPick)
 
 	// Advertise the user-facing commands in Telegram's "/" menu, in English by
 	// default and Russian for ru users; admin commands stay unlisted (they answer
 	// "Not authorised." for everyone else).
 	commandsFor := func(l lang) []tele.Command {
 		m := tr(l)
-		return []tele.Command{
+		cmds := []tele.Command{
 			{Text: "start", Description: m.cmdStart},
 			{Text: "setup", Description: m.cmdSetup},
-			{Text: "lang", Description: m.cmdLang},
-			{Text: "help", Description: m.cmdHelp},
 		}
+		if application.awgConfigured() {
+			cmds = append(cmds, tele.Command{Text: "awg", Description: m.cmdAwg})
+		}
+		return append(cmds,
+			tele.Command{Text: "lang", Description: m.cmdLang},
+			tele.Command{Text: "help", Description: m.cmdHelp},
+		)
 	}
 	if err := bot.SetCommands(commandsFor(langEN)); err != nil {
 		log.Printf("set commands: %v", err)
@@ -131,6 +150,37 @@ func parseAdmins(raw string) (map[int64]bool, error) {
 	return admins, nil
 }
 
+// parseAWGNodes reads VPNBOT_AWG_NODES ("Location=host,Location=host") into a
+// location→host map. Each location must match a panel service/node name.
+func parseAWGNodes(raw string) (map[string]string, error) {
+	nodes := make(map[string]string)
+	for _, field := range strings.Split(raw, ",") {
+		field = strings.TrimSpace(field)
+		if field == "" {
+			continue
+		}
+		name, host, ok := strings.Cut(field, "=")
+		name, host = strings.TrimSpace(name), strings.TrimSpace(host)
+		if !ok || name == "" || host == "" {
+			return nil, fmt.Errorf("VPNBOT_AWG_NODES: %q is not Location=host", field)
+		}
+		nodes[name] = host
+	}
+	return nodes, nil
+}
+
+// awgKeyPath is the SSH key the bot uses to reach the node agents, defaulting to
+// the same key that deployed the nodes.
+func awgKeyPath() string {
+	if key := os.Getenv("VPNBOT_SSH_KEY"); key != "" {
+		return key
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".ssh", "amnezia-ansible")
+	}
+	return ""
+}
+
 func firstArg() string {
 	if len(os.Args) > 1 {
 		return os.Args[1]
@@ -159,5 +209,9 @@ required environment:
   VPN_PANEL_URL/USERNAME/PASSWORD   panel API credentials
 optional environment:
   VPNBOT_LEDGER             delivery ledger path (default /state/ledger.json)
+  VPNBOT_AWG_NODES          AmneziaWG nodes, "Location=host,Location=host"
+  VPNBOT_SSH_KEY            SSH key for the node peer agents (default ~/.ssh/amnezia-ansible)
+  VPNBOT_SSH_USER           SSH user for the node peer agents (default root)
+  VPNBOT_AWG_SCRIPT         node peer-agent path (default /usr/local/sbin/awg-peer)
 `)
 }

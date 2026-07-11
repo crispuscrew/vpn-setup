@@ -34,9 +34,20 @@ type Entry struct {
 	Status   Status `json:"status"`
 }
 
+// AWGPeer is a user's AmneziaWG peer at one location, kept so re-requesting the
+// config re-sends the same keys and address instead of piling up peers.
+type AWGPeer struct {
+	Username   string `json:"username"`
+	Location   string `json:"location"`
+	PublicKey  string `json:"public_key"`
+	PrivateKey string `json:"private_key"`
+	Address    string `json:"address"`
+}
+
 type state struct {
-	Entries []Entry          `json:"entries"`
-	Langs   map[int64]string `json:"langs,omitempty"`
+	Entries  []Entry          `json:"entries"`
+	Langs    map[int64]string `json:"langs,omitempty"`
+	AWGPeers []AWGPeer        `json:"awg_peers,omitempty"`
 }
 
 // Ledger is a set of claim entries backed by a JSON file.
@@ -134,6 +145,32 @@ func (l *Ledger) ByUsername(username string) (Entry, bool) {
 		}
 	}
 	return Entry{}, false
+}
+
+// AWGPeer returns a user's stored AmneziaWG peer for a location, if one exists.
+func (l *Ledger) AWGPeer(username, location string) (AWGPeer, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, peer := range l.data.AWGPeers {
+		if peer.Username == username && peer.Location == location {
+			return peer, true
+		}
+	}
+	return AWGPeer{}, false
+}
+
+// SaveAWGPeer records or updates a user's peer for a location (keyed by both).
+func (l *Ledger) SaveAWGPeer(peer AWGPeer) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i := range l.data.AWGPeers {
+		if l.data.AWGPeers[i].Username == peer.Username && l.data.AWGPeers[i].Location == peer.Location {
+			l.data.AWGPeers[i] = peer
+			return l.save()
+		}
+	}
+	l.data.AWGPeers = append(l.data.AWGPeers, peer)
+	return l.save()
 }
 
 // ByChat returns the entry a chat has already claimed, if any.
