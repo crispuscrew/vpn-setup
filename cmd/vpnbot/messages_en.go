@@ -7,6 +7,7 @@ var enMsg = msg{
 	helpUser: "Commands:\n" +
 		"/start <code> - claim your subscription (a bare /start re-shows it)\n" +
 		"/setup - how to connect on your device\n" +
+		"/awg - get an AmneziaWG config for a location\n" +
 		"/lang - change language (English / Русский)\n" +
 		"/help - show this message\n",
 	helpAdmin: "\nAdmin:\n" +
@@ -33,22 +34,32 @@ var enMsg = msg{
 	subLinkPrefix:   "Your subscription link:\n%s\n\n",
 	multiServerNote: "ℹ️ Using several servers\n" +
 		"We run more than one server, and they are all in your subscription. In your app pick \"Auto\" / \"Best Latency\" (a group, not a single server) to always use the fastest one. It switches over on its own if a server goes down. You can still pick a specific server by name.",
-	steps:          stepsEN,
-	addUsage:       "usage: /add <username>",
-	addCreateFail:  "Could not create user: %s",
-	addGrantPrompt: "Grant locations for %s, then tap Done:",
-	addBadRequest:  "Bad request",
-	addNoUser:      "No such user",
-	addUpdateFail:  "Update failed",
-	addGranted:     "Granted",
-	addRemoved:     "Removed",
-	addPickFirst:   "Pick at least one location first",
-	addDone:        "Created %s (%s).\nSend them this link:\n%s\n\n(or the code: %s)",
-	btnDone:        "✅ Done",
-	chooseLang:     "Choose your language:",
-	langSet:        "Language set to English.",
-	cmdStart:       "Claim or re-show your subscription",
-	cmdSetup:       "How to connect on your device",
-	cmdHelp:        "Show available commands",
-	cmdLang:        "Change language (English / Русский)",
+	steps:            stepsEN,
+	addUsage:         "usage: /add <username>",
+	addCreateFail:    "Could not create user: %s",
+	addGrantPrompt:   "Grant locations for %s, then tap Done:",
+	addBadRequest:    "Bad request",
+	addNoUser:        "No such user",
+	addUpdateFail:    "Update failed",
+	addGranted:       "Granted",
+	addRemoved:       "Removed",
+	addPickFirst:     "Pick at least one location first",
+	addDone:          "Created %s (%s).\nSend them this link:\n%s\n\n(or the code: %s)",
+	btnDone:          "✅ Done",
+	chooseLang:       "Choose your language:",
+	langSet:          "Language set to English.",
+	awgNotConfigured: "AmneziaWG is not available yet. Use /setup for your standard connection.",
+	awgClaimFirst:    "Claim your subscription first with /start <code>, then use /awg.",
+	awgNoLocations:   "You have no AmneziaWG locations available. Ask your administrator.",
+	awgChoose:        "Choose a location for your AmneziaWG config:",
+	awgProvisioning:  "Preparing your config...",
+	awgFailed:        "Could not prepare the config right now - please try again later.",
+	awgCaption: "AmneziaWG config for %s. Open the AmneziaVPN app, tap +, and import this " +
+		"file (or scan the QR below).",
+	awgQRCaption: "Scan this in the AmneziaVPN app to import the config.",
+	cmdStart:     "Claim or re-show your subscription",
+	cmdSetup:     "How to connect on your device",
+	cmdHelp:      "Show available commands",
+	cmdLang:      "Change language (English / Русский)",
+	cmdAwg:       "Get an AmneziaWG config for a location",
 }

@@ -16,5 +16,8 @@
 - name: Set up the server (keys, config, container)
   ansible.builtin.include_tasks: server.yml
 
+- name: Install the node-side peer agent (bot-driven, over SSH)
+  ansible.builtin.include_tasks: peer_agent.yml
+
 - name: Open the AWG port in the host firewall
   ansible.builtin.include_tasks: firewall.yml

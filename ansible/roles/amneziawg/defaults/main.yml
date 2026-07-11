@@ -12,6 +12,8 @@ awg_container: amneziawg
 awg_compose_dir: /opt/vpn-setup/amneziawg
 awg_build_dir: /opt/vpn-setup/amneziawg/build
 awg_config_dir: /var/lib/amneziawg
+# Node-side peer agent the vpnbot invokes over SSH (see VPNBOT_AWG_SCRIPT).
+awg_peer_script: /usr/local/sbin/awg-peer
 
 # Network
 awg_port: 51820             # AWG UDP listen port (free on every node)

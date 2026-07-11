@@ -1,0 +1,139 @@
+#!/bin/sh
+# Managed by Ansible (vpn-setup) - node-side AmneziaWG peer agent. The vpnbot runs
+# this over SSH to provision a user's peer on the node the user chose, then builds
+# the client config from `server-profile`. Peer writes go to both awg0.conf (so a
+# restart keeps them) and the live interface (so they work now). All mutations are
+# serialised with a lock, and add-peer is idempotent per public key.
+set -eu
+
+CONF="{{ awg_config_dir }}/awg0.conf"
+PUB_FILE="{{ awg_config_dir }}/server_public.key"
+PSK_FILE="{{ awg_config_dir }}/server_psk.key"
+PSK_IN_CONTAINER="/opt/amnezia/awg/server_psk.key"
+CONTAINER="{{ awg_container }}"
+SUBNET="{{ awg_subnet }}"
+SERVER_LAST="$(echo '{{ awg_server_ip }}' | sed 's/.*\.//')"
+
+LOCK="/var/lock/awg-peer.lock"
+exec 9>"$LOCK"
+flock 9
+
+die() { echo "awg-peer: $1" >&2; exit 1; }
+[ -f "$CONF" ]     || die "no awg0.conf on this node"
+[ -f "$PUB_FILE" ] || die "no server public key on this node"
+
+# valid_key rejects anything that is not a 44-char base64 WireGuard key, so an
+# attacker-controlled argument can never smuggle shell metacharacters downstream.
+valid_key() {
+  echo "$1" | grep -Eq '^[A-Za-z0-9+/]{43}=$'
+}
+
+# allowed_ip_of prints the AllowedIPs host address recorded for a public key, or
+# nothing when the key is not a peer yet.
+allowed_ip_of() {
+  awk -v key="$1" '
+    /^[[:space:]]*PublicKey/  { inpeer = ($3 == key) }
+    inpeer && /^[[:space:]]*AllowedIPs/ { split($3, a, "/"); print a[1]; exit }
+  ' "$CONF"
+}
+
+# next_free_ip returns the lowest unused host address in the subnet (server .1 and
+# every existing peer excluded), or empty when the pool is exhausted.
+next_free_ip() {
+  used="$SERVER_LAST
+$(grep -oE 'AllowedIPs[[:space:]]*=[[:space:]]*'"$SUBNET"'\.[0-9]+' "$CONF" | grep -oE '[0-9]+$')"
+  oct=2
+  while [ "$oct" -le 254 ]; do
+    if ! echo "$used" | grep -qx "$oct"; then
+      echo "${SUBNET}.${oct}"
+      return 0
+    fi
+    oct=$((oct + 1))
+  done
+  return 1
+}
+
+cmd_server_profile() {
+  pub=$(cat "$PUB_FILE")
+  psk=""
+  [ -f "$PSK_FILE" ] && psk=$(cat "$PSK_FILE")
+
+  # Obfuscation is read from the live interface, not templated, so a client config
+  # can never drift out of sync with what the server actually enforces. Missing
+  # values fall back to the deploy-time defaults.
+  show=$(docker exec "$CONTAINER" awg show awg0 2>/dev/null || true)
+  live() { echo "$show" | sed -n "s/^[[:space:]]*$1:[[:space:]]*//p" | head -1; }
+  val() { v=$(live "$1"); [ -n "$v" ] && echo "$v" || echo "$2"; }
+
+  printf '{"public_key":"%s","preshared_key":"%s","endpoint":"%s:%s",' \
+    "$pub" "$psk" "{{ ansible_host }}" "{{ awg_port }}"
+  printf '"dns":"%s","protocol":"%s",' "{{ awg_dns }}" "{{ awg_protocol }}"
+  printf '"jc":%s,"jmin":%s,"jmax":%s,' "$(val jc {{ awg_jc }})" "$(val jmin {{ awg_jmin }})" "$(val jmax {{ awg_jmax }})"
+  printf '"s1":%s,"s2":%s,"s3":%s,"s4":%s,' "$(val s1 {{ awg_s1 }})" "$(val s2 {{ awg_s2 }})" "$(val s3 {{ awg_s3 }})" "$(val s4 {{ awg_s4 }})"
+  printf '"h1":%s,"h2":%s,"h3":%s,"h4":%s}\n' "$(val h1 {{ awg_h1 }})" "$(val h2 {{ awg_h2 }})" "$(val h3 {{ awg_h3 }})" "$(val h4 {{ awg_h4 }})"
+}
+
+cmd_add_peer() {
+  name="$1"
+  pub="$2"
+  valid_key "$pub" || die "invalid client public key"
+  echo "$name" | grep -Eq '^[A-Za-z0-9_.-]{1,64}$' || die "invalid peer name"
+
+  existing=$(allowed_ip_of "$pub")
+  if [ -n "$existing" ]; then
+    printf '{"address":"%s"}\n' "$existing"
+    return 0
+  fi
+
+  ip=$(next_free_ip) || die "address pool exhausted"
+  psk=$(cat "$PSK_FILE")
+  {
+    printf '\n[Peer]\n# %s\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s/32\n' \
+      "$name" "$pub" "$psk" "$ip"
+  } >> "$CONF"
+
+  docker exec "$CONTAINER" awg set awg0 peer "$pub" \
+    preshared-key "$PSK_IN_CONTAINER" allowed-ips "${ip}/32"
+
+  printf '{"address":"%s"}\n' "$ip"
+}
+
+cmd_del_peer() {
+  pub="$1"
+  valid_key "$pub" || die "invalid client public key"
+  tmp="${CONF}.tmp"
+  awk -v key="$pub" '
+    BEGIN { RS = ""; FS = "\n" }
+    {
+      drop = 0
+      for (i = 1; i <= NF; i++) if ($i ~ ("PublicKey = " key)) drop = 1
+      if (!drop) printf "%s\n\n", $0
+    }
+  ' "$CONF" > "$tmp"
+  mv "$tmp" "$CONF"
+  docker exec "$CONTAINER" awg set awg0 peer "$pub" remove || true
+  echo '{"ok":true}'
+}
+
+cmd_list_peers() {
+  awk '
+    BEGIN { sep = "" }
+    /^[[:space:]]*#/       { name = substr($0, index($0, "#") + 2) }
+    /^[[:space:]]*PublicKey/  { pub = $3 }
+    /^[[:space:]]*AllowedIPs/ {
+      split($3, a, "/")
+      printf "%s{\"name\":\"%s\",\"public_key\":\"%s\",\"address\":\"%s\"}", sep, name, pub, a[1]
+      sep = ","
+      name = ""
+    }
+    END { print "" }
+  ' "$CONF" | sed 's/^/[/; s/$/]/'
+}
+
+case "${1:-}" in
+  server-profile) cmd_server_profile ;;
+  add-peer)  [ $# -eq 3 ] || die "usage: add-peer <name> <client_pubkey>"; cmd_add_peer "$2" "$3" ;;
+  del-peer)  [ $# -eq 2 ] || die "usage: del-peer <client_pubkey>"; cmd_del_peer "$2" ;;
+  list-peers) cmd_list_peers ;;
+  *) die "usage: awg-peer server-profile|add-peer|del-peer|list-peers" ;;
+esac
