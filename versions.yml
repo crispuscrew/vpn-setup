@@ -1,5 +1,7 @@
-# Pinned upstream versions — the single source of truth for image tags.
+# Pinned upstream versions - the single source of truth for image tags.
 # Never use :latest (dev-rules/tech/containers.md). Bump deliberately: a change
 # here ripples to every deployment this repo drives.
 marzneshin_image: "docker.io/dawsh/marzneshin:v0.7.4"
 marznode_image: "docker.io/dawsh/marznode:v0.5.7"
+# TLS reverse proxy in front of the panel (used when panel_domain is set).
+caddy_image: "docker.io/library/caddy:2.8.4"

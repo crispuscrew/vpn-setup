@@ -1,0 +1,4 @@
+- name: restart caddy
+  ansible.builtin.command:
+    cmd: docker compose restart
+    chdir: "{{ caddy_compose_dir }}"

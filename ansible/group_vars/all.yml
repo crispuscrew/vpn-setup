@@ -1,5 +1,5 @@
 # Defaults for every host. Override per-inventory under `vars:`.
-# Pinned image tags are loaded from ../versions.yml by site.yml — not duplicated here.
+# Pinned image tags are loaded from ../versions.yml by site.yml - not duplicated here.
 
 # ── Host bootstrap ────────────────────────────────────────────────────────────
 swap_file: /swapfile
@@ -11,7 +11,7 @@ panel_docs: true             # expose Swagger at /docs (handy while building)
 panel_compose_dir: /opt/vpn-setup/panel
 marzneshin_data_dir: /var/lib/marzneshin
 
-# Sudo admin — generated once, persisted on the control node under ansible/.secrets/,
+# Sudo admin - generated once, persisted on the control node under ansible/.secrets/,
 # reused on every re-run (so the API password is stable). gitignored.
 panel_sudo_username: admin
 panel_sudo_password: "{{ lookup('password', playbook_dir + '/.secrets/panel_admin_' + inventory_hostname + '.txt length=24 chars=ascii_letters,digits') }}"
@@ -20,6 +20,14 @@ panel_sudo_password: "{{ lookup('password', playbook_dir + '/.secrets/panel_admi
 subscription_url_prefix: >-
   {{ ('https://' + panel_domain) if (panel_domain | default('') | length > 0)
      else ('http://' + ansible_host + ':' + (panel_port | string)) }}
+
+# ── TLS reverse proxy (Caddy) ─────────────────────────────────────────────────
+# Runs on the panel host only when panel_domain is set: terminates HTTPS with an
+# automatic Let's Encrypt cert and proxies to the panel's loopback port. With a
+# domain the public panel_port is closed; Caddy owns 80/443 instead.
+caddy_compose_dir: /opt/vpn-setup/caddy
+caddy_data_dir: /var/lib/caddy
+acme_email: ""               # optional Let's Encrypt account email
 
 # ── Node (marznode) ───────────────────────────────────────────────────────────
 node_mode: local             # `local` = all-in-one w/ the panel; `nodes` group overrides to `remote`

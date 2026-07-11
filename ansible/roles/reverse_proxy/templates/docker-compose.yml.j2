@@ -1,0 +1,10 @@
+# Managed by Ansible (vpn-setup). Caddy TLS reverse proxy, pinned; host-networked
+# so it owns 80/443 and proxies to the panel on loopback. Certs persist in /data.
+services:
+  caddy:
+    image: {{ caddy_image }}
+    restart: always
+    network_mode: host
+    volumes:
+      - {{ caddy_compose_dir }}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - {{ caddy_data_dir }}:/data

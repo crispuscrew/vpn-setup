@@ -22,11 +22,15 @@
     dest: "{{ panel_compose_dir }}/docker-compose.yml"
     mode: "0644"
 
-- name: Open the panel port in firewalld
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ panel_port }}/tcp"
-  register: _fw_panel
-  changed_when: "'ALREADY_ENABLED' not in _fw_panel.stdout"
-  notify: reload firewalld
+# Expose the panel port publicly only when nothing fronts it. With panel_domain
+# set, Caddy terminates TLS on 443 and reaches the panel over loopback, so the
+# plain-HTTP port is closed to the internet.
+- name: Panel port open only without a TLS reverse proxy
+  ansible.posix.firewalld:
+    port: "{{ panel_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: "{{ 'disabled' if (panel_domain | default('') | length > 0) else 'enabled' }}"
 
 - name: Start the panel
   ansible.builtin.command:

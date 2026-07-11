@@ -1,0 +1,68 @@
+# TLS reverse proxy (Caddy) in front of the panel: an automatic Let's Encrypt cert
+# for panel_domain, proxying HTTPS to the panel's loopback port. Runs only when a
+# domain is set (see site.yml). Caddy runs as a pinned container, like the rest of
+# the stack, host-networked so it owns 80/443 and reaches the panel on 127.0.0.1.
+- name: Ensure Caddy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ caddy_compose_dir }}"
+    - "{{ caddy_data_dir }}"
+
+- name: Render the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ caddy_compose_dir }}/Caddyfile"
+    mode: "0644"
+  notify: restart caddy
+
+- name: Render the Caddy compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ caddy_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Open HTTP and HTTPS in firewalld
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "80/tcp"
+    - "443/tcp"
+  when: ansible_os_family == 'RedHat'
+
+- name: Open HTTP and HTTPS in ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+  when: ansible_os_family == 'Debian'
+
+- name: Start Caddy
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ caddy_compose_dir }}"
+  register: _caddy_up
+  changed_when: >-
+    ('Started' in _caddy_up.stderr) or ('Created' in _caddy_up.stderr)
+    or ('Recreated' in _caddy_up.stderr)
+
+- name: Apply any pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for HTTPS to serve the panel with a valid certificate
+  ansible.builtin.uri:
+    url: "https://{{ panel_domain }}/dashboard/"
+    status_code: [200]
+    validate_certs: true
+  register: _https_health
+  retries: 30
+  delay: 5
+  until: _https_health.status == 200

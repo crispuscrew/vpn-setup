@@ -29,6 +29,7 @@ all:
     ansible_ssh_private_key_file: "~/.ssh/vpn-setup"
     ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
 
-    panel_domain: ""
+    panel_domain: ""                         # set a domain (DNS A-record -> panel host) for
+                                             # automatic HTTPS via Caddy; empty = IP-only HTTP
     # VLESS-Reality borrow target (see single.yml.example for guidance).
     reality_sni: "dl.google.com"
