@@ -20,12 +20,12 @@ We run more than one server, and they are all in your subscription. In your app 
 var platforms = []struct{ key, label, steps string }{
 	{"ios", "🍎 iOS", `🍎 iOS setup
 
-Recommended app: Streisand (free) or Hiddify — both on the App Store.
+Recommended app: Streisand (free) or Hiddify, both on the App Store.
 
 1. Install Streisand from the App Store.
 2. Copy your subscription link (send /start if you need it again).
 3. Open Streisand, tap ＋ (top-right), then "Add from Clipboard".
-   Or tap ＋ → "Scan QR Code" and scan the QR image above.
+   Or tap ＋ → "Scan QR Code" and scan the QR from your /start message.
 4. Select the config and tap Connect.`},
 
 	{"android", "🤖 Android", `🤖 Android setup
@@ -35,7 +35,7 @@ Recommended app: Hiddify or v2rayNG (both free).
 1. Install Hiddify from Google Play, or v2rayNG from GitHub.
 2. Copy your subscription link (send /start if you need it again).
 3. Open the app, tap ＋, then "Add from clipboard" / "Import from link".
-   Or tap ＋ → "Scan QR code" and scan the QR image above.
+   Or tap ＋ → "Scan QR code" and scan the QR from your /start message.
 4. Tap the power button to connect.`},
 
 	{"windows", "🪟 Windows", `🪟 Windows setup
@@ -49,7 +49,7 @@ Recommended app: Hiddify (hiddify.com) or v2rayN.
 
 	{"macos", "💻 macOS", `💻 macOS setup
 
-Recommended app: Hiddify (hiddify.com) — Apple Silicon & Intel.
+Recommended app: Hiddify (hiddify.com), Apple Silicon and Intel.
 
 1. Install Hiddify for macOS.
 2. Copy your subscription link (send /start if you need it again).
@@ -64,10 +64,10 @@ Hiddify:
 1. Download the Hiddify AppImage, make it executable, and run it.
 2. New Profile → paste your subscription link → Add → Connect.
 
-sing-box (CLI): append /sing-box to your link and run —
+sing-box (CLI): append /sing-box to your link and run:
   curl -L "YOUR_LINK/sing-box" -o config.json
   sing-box run -c config.json
-Send /start to get your link.`},
+Your link is shown above, or send /start to get it.`},
 }
 
 // setupBtn only registers the callback endpoint; every picker button shares its
