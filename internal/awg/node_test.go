@@ -28,18 +28,21 @@ func TestPeerNameTruncates(t *testing.T) {
 	}
 }
 
-func TestShellJoinQuotesUnsafe(t *testing.T) {
-	cases := map[string]string{
-		"plain":             "plain",
-		"10.8.0.5/32":       "10.8.0.5/32",
-		"a b":               "'a b'",
-		"x;rm -rf /":        "'x;rm -rf /'",
-		"it's":              `'it'\''s'`,
-		"base64+key/value=": "base64+key/value=",
+func TestRemoteCommandJoinsSafeArgs(t *testing.T) {
+	got, err := remoteCommand("/usr/local/sbin/awg-peer", []string{"add-peer", "alice-USA", "abc+def/ghi="})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for in, want := range cases {
-		if got := shellJoin([]string{in}); got != want {
-			t.Errorf("shellJoin(%q) = %q, want %q", in, got, want)
+	want := "/usr/local/sbin/awg-peer add-peer alice-USA abc+def/ghi="
+	if got != want {
+		t.Errorf("remoteCommand = %q, want %q", got, want)
+	}
+}
+
+func TestRemoteCommandRejectsUnsafeArgs(t *testing.T) {
+	for _, bad := range []string{"a b", "x;rm -rf /", "it's", "$(whoami)", "a`b`", "a|b"} {
+		if _, err := remoteCommand("/usr/local/sbin/awg-peer", []string{"add-peer", bad, "key"}); err == nil {
+			t.Errorf("remoteCommand should reject %q", bad)
 		}
 	}
 }
