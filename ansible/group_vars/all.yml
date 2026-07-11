@@ -37,7 +37,20 @@ marznode_port: 53042         # panel ↔ marznode gRPC (secure, panel-cert authe
 
 # ── Protocol ports (host networking; opened in firewalld) ─────────────────────
 reality_port: 443            # VLESS-Reality (needs no domain)
-hysteria2_port: 8443         # Hysteria2 (UDP), only if enabled
+hysteria2_port: 8443         # Hysteria2 (UDP)
+tuic_port: 8444              # TUIC (UDP, via sing-box)
+
+# ── Hysteria2 + TUIC ──────────────────────────────────────────────────────────
+# Both are UDP protocols that require TLS but the nodes have no per-node domain, so
+# they share a per-node self-signed cert and their subscription links set
+# `allowinsecure`. This trades cert authentication for working out of the box on a
+# bare IP; the connection is direct (no CDN to MITM), auth is by per-user password,
+# and Hysteria2's salamander obfs makes the port appear closed without the password.
+# Give a node a real domain + cert to drop `allowinsecure` later. Toggle per host.
+hysteria2_enabled: true
+tuic_enabled: true
+# SNI presented in the TLS handshake (blending only; the cert is self-signed).
+tls_sni: "www.bing.com"
 
 # VLESS-Reality borrow target (dest + serverNames). Must be a real, reachable
 # TLS 1.3 + X25519 site whose handshake xray can proxy. Verified good defaults:

@@ -1,0 +1,23 @@
+{
+  "log": { "level": "warn" },
+  "inbounds": [
+    {
+      "type": "tuic",
+      "tag": "TUIC",
+      "listen": "::",
+      "listen_port": {{ tuic_port }},
+      "users": [],
+      "congestion_control": "bbr",
+      "tls": {
+        "enabled": true,
+        "server_name": "{{ tls_sni }}",
+        "alpn": ["h3"],
+        "certificate_path": "{{ marznode_dir }}/tls_cert.pem",
+        "key_path": "{{ marznode_dir }}/tls_key.pem"
+      }
+    }
+  ],
+  "outbounds": [
+    { "type": "direct", "tag": "direct" }
+  ]
+}

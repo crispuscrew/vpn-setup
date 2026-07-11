@@ -4,3 +4,17 @@
   register: _fw_reality
   changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
   notify: reload firewalld
+
+- name: Open the Hysteria2 port in firewalld (UDP)
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ hysteria2_port }}/udp"
+  register: _fw_hy2
+  changed_when: "'ALREADY_ENABLED' not in _fw_hy2.stdout"
+  notify: reload firewalld
+  when: hysteria2_enabled | default(false) | bool
+
+- name: Open the TUIC port in firewalld (UDP)
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ tuic_port }}/udp"
+  register: _fw_tuic
+  changed_when: "'ALREADY_ENABLED' not in _fw_tuic.stdout"
+  notify: reload firewalld
+  when: tuic_enabled | default(false) | bool
