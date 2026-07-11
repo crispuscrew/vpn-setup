@@ -33,6 +33,21 @@
     proto: udp
   when: tuic_enabled | default(false) | bool
 
+- name: Allow the Shadowsocks port (TCP+UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ shadowsocks_port }}"
+    proto: "{{ item }}"
+  loop: [tcp, udp]
+  when: shadowsocks_enabled | default(false) | bool
+
+- name: Allow the Trojan port (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ trojan_port }}"
+    proto: tcp
+  when: trojan_enabled | default(false) | bool
+
 - name: Enable ufw (default deny incoming, allow outgoing)
   community.general.ufw:
     state: enabled

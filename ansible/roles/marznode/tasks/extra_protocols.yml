@@ -1,6 +1,8 @@
-# Hysteria2 (UDP) and TUIC (UDP, via sing-box) both need TLS but the nodes carry no
-# per-node domain, so they share one self-signed cert generated here once and
-# reused. The subscription links set allowinsecure (see register.yml).
+# Hysteria2 (UDP), TUIC (UDP, via sing-box), and Trojan (TCP, via xray) all need TLS
+# but the nodes carry no per-node domain, so they share one self-signed cert
+# generated here once and reused. The subscription links set allowinsecure (see
+# register.yml). Trojan reads the cert straight from its xray inbound; only the
+# Hysteria2/TUIC core configs are rendered below.
 - name: Check for the self-signed TLS cert
   ansible.builtin.stat:
     path: "{{ marznode_dir }}/tls_cert.pem"

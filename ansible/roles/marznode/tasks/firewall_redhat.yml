@@ -18,3 +18,18 @@
   changed_when: "'ALREADY_ENABLED' not in _fw_tuic.stdout"
   notify: reload firewalld
   when: tuic_enabled | default(false) | bool
+
+- name: Open the Shadowsocks port in firewalld (TCP+UDP)
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ shadowsocks_port }}/{{ item }}"
+  loop: [tcp, udp]
+  register: _fw_ss
+  changed_when: "'ALREADY_ENABLED' not in _fw_ss.stdout"
+  notify: reload firewalld
+  when: shadowsocks_enabled | default(false) | bool
+
+- name: Open the Trojan port in firewalld (TCP)
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ trojan_port }}/tcp"
+  register: _fw_trojan
+  changed_when: "'ALREADY_ENABLED' not in _fw_trojan.stdout"
+  notify: reload firewalld
+  when: trojan_enabled | default(false) | bool

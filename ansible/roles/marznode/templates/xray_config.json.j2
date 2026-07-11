@@ -26,7 +26,37 @@
         }
       },
       "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
-    }
+    }{% if shadowsocks_enabled | default(false) | bool %},
+    {
+      "tag": "SHADOWSOCKS",
+      "listen": "0.0.0.0",
+      "port": {{ shadowsocks_port }},
+      "protocol": "shadowsocks",
+      "settings": { "clients": [], "network": "tcp,udp" },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
+    }{% endif %}{% if trojan_enabled | default(false) | bool %},
+    {
+      "tag": "TROJAN",
+      "listen": "0.0.0.0",
+      "port": {{ trojan_port }},
+      "protocol": "trojan",
+      "settings": { "clients": [] },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "{{ tls_sni }}",
+          "alpn": ["http/1.1"],
+          "certificates": [
+            {
+              "certificateFile": "{{ marznode_dir }}/tls_cert.pem",
+              "keyFile": "{{ marznode_dir }}/tls_key.pem"
+            }
+          ]
+        }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
+    }{% endif %}
   ],
   "outbounds": [
     { "protocol": "freedom", "tag": "direct" },
