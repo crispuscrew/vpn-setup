@@ -64,7 +64,11 @@ func run() error {
 	}
 	var awgAgent *awg.NodeAgent
 	if len(awgNodes) > 0 {
-		awgAgent = awg.NewNodeAgent(awgKeyPath(), os.Getenv("VPNBOT_SSH_USER"), os.Getenv("VPNBOT_AWG_SCRIPT"))
+		awgAgent, err = awg.NewNodeAgent(awgKeyPath(), os.Getenv("VPNBOT_SSH_USER"),
+			os.Getenv("VPNBOT_AWG_SCRIPT"), os.Getenv("VPNBOT_SSH_KNOWN_HOSTS"))
+		if err != nil {
+			return fmt.Errorf("awg node agent: %w", err)
+		}
 	}
 
 	bot, err := tele.NewBot(tele.Settings{
@@ -212,6 +216,7 @@ optional environment:
   VPNBOT_AWG_NODES          AmneziaWG nodes, "Location=host,Location=host"
   VPNBOT_SSH_KEY            SSH key for the node peer agents (default ~/.ssh/amnezia-ansible)
   VPNBOT_SSH_USER           SSH user for the node peer agents (default root)
+  VPNBOT_SSH_KNOWN_HOSTS    known_hosts file to verify node host keys (optional)
   VPNBOT_AWG_SCRIPT         node peer-agent path (default /usr/local/sbin/awg-peer)
 `)
 }

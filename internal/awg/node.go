@@ -1,46 +1,76 @@
 package awg
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
+	"net"
+	"os"
 	"regexp"
 	"strings"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-// Default SSH wiring. The bot runs on the Ansible control box, so it reuses the
-// same key and root login already used to deploy the nodes; when the bot moves to
-// its own host this should become a forced-command-restricted key.
+// Default SSH wiring. On the panel host the bot uses a dedicated key that each node
+// restricts to the awg-peer command with a forced command, so it can do nothing
+// else there.
 const (
 	DefaultUser   = "root"
 	DefaultScript = "/usr/local/sbin/awg-peer"
+	dialTimeout   = 15 * time.Second
 )
 
 var (
 	// peerNameSafe is the charset the node agent accepts for a peer name; the bot
 	// sanitises to it so a username can never inject shell metacharacters.
 	peerNameSafe = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
-	shellUnsafe  = regexp.MustCompile(`[^A-Za-z0-9_./:=@%+-]`)
+	// argSafe is the charset allowed in a remote command argument. Every argument
+	// (fixed subcommands, sanitised names, base64 keys) fits it, so the remote
+	// command is a plain space-joined string that both a login shell and the
+	// forced-command wrapper's word-split parse identically - no quoting needed.
+	argSafe = regexp.MustCompile(`^[A-Za-z0-9_.:/=+@%-]+$`)
 )
 
-// NodeAgent runs the node-side awg-peer script over SSH.
+// NodeAgent runs the node-side awg-peer script over SSH (pure Go, so it works in a
+// scratch container).
 type NodeAgent struct {
-	keyPath string
-	user    string
-	script  string
+	user      string
+	script    string
+	signer    ssh.Signer
+	hostKeyCB ssh.HostKeyCallback
 }
 
-// NewNodeAgent returns an agent that logs in as user with keyPath and runs script
-// on the target node. Empty user/script fall back to the defaults.
-func NewNodeAgent(keyPath, user, script string) *NodeAgent {
+// NewNodeAgent returns an agent that logs in as user with the private key at keyPath
+// and runs script on the target node. Empty user/script fall back to the defaults.
+// When knownHostsPath is set the node's host key is verified against it; otherwise
+// host keys are not verified.
+func NewNodeAgent(keyPath, user, script, knownHostsPath string) (*NodeAgent, error) {
 	if user == "" {
 		user = DefaultUser
 	}
 	if script == "" {
 		script = DefaultScript
 	}
-	return &NodeAgent{keyPath: keyPath, user: user, script: script}
+	keyBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read ssh key: %w", err)
+	}
+	signer, err := ssh.ParsePrivateKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse ssh key: %w", err)
+	}
+	hostKeyCB := ssh.InsecureIgnoreHostKey()
+	if knownHostsPath != "" {
+		hostKeyCB, err = knownhosts.New(knownHostsPath)
+		if err != nil {
+			return nil, fmt.Errorf("load known_hosts: %w", err)
+		}
+	}
+	return &NodeAgent{user: user, script: script, signer: signer, hostKeyCB: hostKeyCB}, nil
 }
 
 // PeerName builds a stable, node-safe peer name for a user at a location.
@@ -91,42 +121,68 @@ func (n *NodeAgent) DelPeer(ctx context.Context, host, pubkey string) error {
 	return err
 }
 
-// run executes the awg-peer script with args on host over SSH and returns stdout.
-// The remote command is assembled with shell quoting so an argument is never
-// re-split or interpreted by the remote shell.
+// run dials host over SSH, runs the awg-peer script with args, and returns stdout.
 func (n *NodeAgent) run(ctx context.Context, host string, args ...string) ([]byte, error) {
-	remote := shellJoin(append([]string{n.script}, args...))
-	sshArgs := []string{
-		"-i", n.keyPath,
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=15",
-		"-o", "StrictHostKeyChecking=accept-new",
-		n.user + "@" + host,
-		remote,
+	cmd, err := remoteCommand(n.script, args)
+	if err != nil {
+		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, "ssh", sshArgs...)
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
+	addr := net.JoinHostPort(host, "22")
+	dialer := net.Dialer{Timeout: dialTimeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s: %w", host, err)
+	}
+	cfg := &ssh.ClientConfig{
+		User:            n.user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(n.signer)},
+		HostKeyCallback: n.hostKeyCB,
+		Timeout:         dialTimeout,
+	}
+	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("ssh handshake %s: %w", host, err)
+	}
+	client := ssh.NewClient(sshConn, chans, reqs)
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+	var stdout, stderr bytes.Buffer
+	session.Stdout = &stdout
+	session.Stderr = &stderr
+
+	done := make(chan error, 1)
+	go func() { done <- session.Run(cmd) }()
+	select {
+	case <-ctx.Done():
+		session.Close()
+		return nil, ctx.Err()
+	case err := <-done:
+		if err != nil {
+			msg := strings.TrimSpace(stderr.String())
+			if msg == "" {
+				msg = err.Error()
+			}
+			return nil, fmt.Errorf("awg-peer on %s: %s", host, msg)
 		}
-		return nil, fmt.Errorf("awg-peer on %s: %s", host, msg)
 	}
-	return []byte(stdout.String()), nil
+	return stdout.Bytes(), nil
 }
 
-// shellJoin single-quotes each token so the remote shell treats it literally.
-func shellJoin(tokens []string) string {
-	quoted := make([]string, len(tokens))
-	for i, tok := range tokens {
-		if tok != "" && !shellUnsafe.MatchString(tok) {
-			quoted[i] = tok
-			continue
+// remoteCommand joins the script and args into the command string sent over SSH.
+// Every argument must be shell-safe so the string needs no quoting - the node's
+// forced-command wrapper word-splits it, which quoting would defeat.
+func remoteCommand(script string, args []string) (string, error) {
+	parts := append([]string{script}, args...)
+	for _, part := range parts {
+		if !argSafe.MatchString(part) {
+			return "", fmt.Errorf("unsafe remote argument %q", part)
 		}
-		quoted[i] = "'" + strings.ReplaceAll(tok, "'", `'\''`) + "'"
 	}
-	return strings.Join(quoted, " ")
+	return strings.Join(parts, " "), nil
 }
