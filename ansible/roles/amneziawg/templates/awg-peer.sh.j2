@@ -38,10 +38,12 @@ allowed_ip_of() {
 }
 
 # next_free_ip returns the lowest unused host address in the subnet (server .1 and
-# every existing peer excluded), or empty when the pool is exhausted.
+# every existing peer excluded), or empty when the pool is exhausted. The grep is
+# guarded with `|| true` because under `set -e` in dash a no-match pipeline would
+# otherwise abort the function (an empty config is normal, not an error).
 next_free_ip() {
   used="$SERVER_LAST
-$(grep -oE 'AllowedIPs[[:space:]]*=[[:space:]]*'"$SUBNET"'\.[0-9]+' "$CONF" | grep -oE '[0-9]+$')"
+$(grep -oE 'AllowedIPs[[:space:]]*=[[:space:]]*'"$SUBNET"'\.[0-9]+' "$CONF" | grep -oE '[0-9]+$' || true)"
   oct=2
   while [ "$oct" -le 254 ]; do
     if ! echo "$used" | grep -qx "$oct"; then
@@ -87,13 +89,16 @@ cmd_add_peer() {
 
   ip=$(next_free_ip) || die "address pool exhausted"
   psk=$(cat "$PSK_FILE")
+
+  # Apply to the live interface first; only persist to awg0.conf once it succeeds,
+  # so a failed docker exec never leaves a half-written peer behind.
+  docker exec "$CONTAINER" awg set awg0 peer "$pub" \
+    preshared-key "$PSK_IN_CONTAINER" allowed-ips "${ip}/32"
+
   {
     printf '\n[Peer]\n# %s\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s/32\n' \
       "$name" "$pub" "$psk" "$ip"
   } >> "$CONF"
-
-  docker exec "$CONTAINER" awg set awg0 peer "$pub" \
-    preshared-key "$PSK_IN_CONTAINER" allowed-ips "${ip}/32"
 
   printf '{"address":"%s"}\n' "$ip"
 }
@@ -102,11 +107,13 @@ cmd_del_peer() {
   pub="$1"
   valid_key "$pub" || die "invalid client public key"
   tmp="${CONF}.tmp"
+  # index() matches the key literally; `~` would treat the key's +/ characters as
+  # regex metacharacters and fail to remove the block.
   awk -v key="$pub" '
     BEGIN { RS = ""; FS = "\n" }
     {
       drop = 0
-      for (i = 1; i <= NF; i++) if ($i ~ ("PublicKey = " key)) drop = 1
+      for (i = 1; i <= NF; i++) if (index($i, key) > 0) drop = 1
       if (!drop) printf "%s\n\n", $0
     }
   ' "$CONF" > "$tmp"
