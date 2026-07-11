@@ -47,7 +47,9 @@ make test       # go test ./...
 
 ## Deploy
 
-Provision a host (panel plus one all-in-one node) with Ansible:
+For a full step-by-step runbook (prerequisites, extra nodes, the bot), see
+[docs/DEPLOY.md](docs/DEPLOY.md). In short, provision a host (panel plus one
+all-in-one node) with Ansible:
 
 ```
 cp ansible/inventory/single.yml.example ansible/inventory/<name>.yml   # set host + reality_sni

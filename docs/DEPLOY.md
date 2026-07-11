@@ -1,0 +1,148 @@
+# Deploying a server
+
+Step-by-step to stand up the stack from a bare VPS: the Marzneshin panel plus one
+all-in-one node, then extra nodes, the config-as-code reconcile, and the delivery
+bot. For the design behind it see the [README](../README.md); this is the runbook.
+
+## What you end up with
+
+- A **panel** host running Marzneshin plus a local all-in-one `marznode` that serves
+  VLESS-Reality.
+- Zero or more **extra node** hosts, each running a `marznode` the panel reaches over
+  mutual TLS. A user's single subscription spans every node, and clients auto-select
+  the fastest with failover.
+- The `vpn` CLI reconciling panel services and users from `vpn.yaml`.
+- The `vpnbot` Telegram bot handing each user their subscription URL and QR.
+
+## Prerequisites
+
+On your **control machine** (where you run the commands, not the server):
+
+- `ansible-playbook` with the `ansible.posix` collection
+  (`ansible-galaxy collection install ansible.posix`).
+- Either Podman or Docker, for the `make` build of the Go binaries. The host Go
+  toolchain is not required; the build runs in a pinned container.
+- An SSH keypair whose public half you can put on the server.
+
+Each **server**:
+
+- A fresh VPS running Alma Linux 9 (or a RHEL 9 clone), reachable by SSH as `root`
+  with your key.
+- For a real deployment, a domain name pointed at the panel host (optional but
+  recommended; without one, subscription links are IP-only and use plain HTTP).
+
+## 1. Get the code and build the tools
+
+```
+git clone https://github.com/crispuscrew/vpn-setup.git
+cd vpn-setup
+make build          # builds bin/vpn and bin/vpnbot in the container
+```
+
+## 2. Write the inventory
+
+Real inventories are gitignored; copy an example and fill it in.
+
+Single all-in-one box:
+
+```
+cp ansible/inventory/single.yml.example ansible/inventory/prod.yml
+```
+
+Set `ansible_host` to your VPS IP, `ansible_ssh_private_key_file` to your key, and
+`reality_sni` to a reachable TLS 1.3 site that is not blocked in your target region
+(`dl.google.com`, `www.google.com`, or `www.cloudflare.com` are verified good;
+**do not** use `www.microsoft.com`). Set `panel_domain` to your FQDN, or leave it
+empty for an IP-only test box.
+
+## 3. Provision the host
+
+```
+ansible-playbook ansible/site.yml -i ansible/inventory/prod.yml
+```
+
+This installs the container engine, brings up the pinned panel
+(`dawsh/marzneshin:v0.7.4`) and node (`dawsh/marznode:v0.5.7`), renders the node's
+Reality inbound, opens the firewall, and registers the node with the panel. It
+generates a sudo admin once and stores its password on your control machine under
+`ansible/.secrets/panel_admin_<host>.txt` (gitignored); re-runs reuse it, so the API
+password stays stable. The play waits until the node reports healthy before
+finishing.
+
+Reach the panel at `http://<panel-ip>:8000` (or `https://<domain>` behind your own
+TLS). Swagger is at `/docs` while `panel_docs` is true.
+
+## 4. Apply the panel config-as-code
+
+`vpn` reads the panel URL and admin credentials from the environment, never from
+files, then reconciles the declared state in `vpn.yaml` (a service grouping every
+discovered inbound, plus any declared users). Reconcile is idempotent and additive.
+
+```
+export VPN_PANEL_URL=http://<panel-ip>:8000
+export VPN_PANEL_USERNAME=admin
+export VPN_PANEL_PASSWORD="$(cat ansible/.secrets/panel_admin_<host>.txt)"
+
+./bin/vpn apply -f vpn.yaml     # create/update services + users
+./bin/vpn status                # discovered inbounds, services, users
+./bin/vpn health                # panel + per-node health (non-zero exit if degraded)
+./bin/vpn sub <user>            # print a user's subscription URL
+```
+
+## 5. Add another node
+
+Use the multi-node inventory: a `panel` host plus a `nodes` group. Give each host a
+distinct `node_label` so the several servers a subscription spans are told apart in
+the client's server list.
+
+```
+cp ansible/inventory/multi.yml.example ansible/inventory/prod.yml
+# set ansible_host and node_label for the panel host and each node, then:
+ansible-playbook ansible/site.yml -i ansible/inventory/prod.yml
+```
+
+The panel opens the node's gRPC port to itself only, fetches its own client
+certificate, and connects over mutual TLS; the node's subscription host is pointed
+at the node's own public address. Re-run `./bin/vpn status` and confirm the new
+node's inbound appears. No change to `vpn.yaml` is needed: the `all` service already
+grabs every inbound.
+
+## 6. Run the delivery bot
+
+Create a bot with @BotFather for the token, and get your numeric Telegram id (for
+example from @userinfobot) for the admin allowlist.
+
+```
+make image     # builds the small non-root vpnbot container
+```
+
+Run the container with these set (plus a writable volume at `/state` for the
+delivery ledger):
+
+- `VPNBOT_TOKEN` bot token from @BotFather.
+- `VPNBOT_ADMINS` comma-separated admin Telegram user ids.
+- `VPN_PANEL_URL`, `VPN_PANEL_USERNAME`, `VPN_PANEL_PASSWORD` as in step 4.
+- Optional `VPNBOT_LEDGER` (default `/state/ledger.json`) and
+  `VPNBOT_DEFAULT_SERVICE` (default `all`).
+
+An admin runs `/add <username>` to create a panel user and get a one-time claim
+link; the recipient taps it and receives their subscription URL and QR once, with a
+`/setup` device guide. `/list`, `/revoke`, and `/help` round out the admin face.
+
+## Security
+
+- Never commit secrets. The bot token, panel admin password
+  (`ansible/.secrets/`), and node certificates are gitignored and environment-only.
+- Access is admin-provisioned: users exist only when created in the panel or via the
+  bot's admin `/add`, and the bot delivers only to the claiming recipient.
+- Image tags are pinned in `versions.yml`; never move to `:latest`.
+
+## Troubleshooting
+
+- **Reality clients fail to connect** with "processed invalid connection": the
+  `reality_sni` target is not borrowable. Switch to `dl.google.com` and re-run the
+  playbook; the change propagates to the inbound and the generated links.
+- **Rootless Podman can't resolve names** behind a VPN with DNS-leak protection: add
+  `--dns=1.1.1.1` (or your trusted resolver) to the build. A stopgap, not a fix.
+- **A node never goes healthy**: confirm the panel can reach the node on
+  `marznode_port` (53042) and that the node host's firewall allows the panel.
