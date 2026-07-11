@@ -65,6 +65,29 @@ func (c *Client) UpdateUser(ctx context.Context, username, expireStrategy string
 	return &out, nil
 }
 
+type userServices struct {
+	ServiceIDs     []int  `json:"service_ids"`
+	ExpireStrategy string `json:"expire_strategy"`
+}
+
+// SetServices replaces a user's granted services. Unlike UpdateUser it sends the
+// list explicitly, so an empty slice clears every service (an empty list is
+// omitted by UpdateUser). Used by the bot's per-location grant toggle.
+func (c *Client) SetServices(ctx context.Context, username, expireStrategy string, serviceIDs []int) (*User, error) {
+	if serviceIDs == nil {
+		serviceIDs = []int{}
+	}
+	if expireStrategy == "" {
+		expireStrategy = ExpireNever
+	}
+	var out User
+	body := userServices{ServiceIDs: serviceIDs, ExpireStrategy: expireStrategy}
+	if err := c.do(ctx, http.MethodPut, "/api/users/"+username, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // DeleteUser removes a user.
 func (c *Client) DeleteUser(ctx context.Context, username string) error {
 	return c.do(ctx, http.MethodDelete, "/api/users/"+username, nil, nil)
