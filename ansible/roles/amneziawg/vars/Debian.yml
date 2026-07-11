@@ -1,0 +1,3 @@
+os_packages:
+  - iptables
+  - ca-certificates

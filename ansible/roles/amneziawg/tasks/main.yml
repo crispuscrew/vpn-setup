@@ -1,0 +1,20 @@
+# Stand up an AmneziaWG userspace server on this node. Peers are added later, live,
+# by the bot; this role owns the server identity, obfuscation profile, and awg0
+# interface, and it does not clobber peers added out of band.
+- name: Load OS-specific vars
+  ansible.builtin.include_vars: "vars/{{ ansible_os_family }}.yml"
+
+- name: Pre-flight (packages, IP forwarding, directories)
+  ansible.builtin.include_tasks: preflight.yml
+
+- name: Resolve the AWG obfuscation profile
+  ansible.builtin.include_tasks: obfuscation.yml
+
+- name: Build the AmneziaWG server image
+  ansible.builtin.include_tasks: image.yml
+
+- name: Set up the server (keys, config, container)
+  ansible.builtin.include_tasks: server.yml
+
+- name: Open the AWG port in the host firewall
+  ansible.builtin.include_tasks: firewall.yml

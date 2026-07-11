@@ -1,0 +1,40 @@
+# A per-node obfuscation profile, generated once and reused so the params stay
+# stable across re-runs. Inventory overrides still win (see defaults/main.yml).
+- name: Obfuscation | Check for a saved profile
+  ansible.builtin.stat:
+    path: "{{ awg_config_dir }}/obfuscation-params.yml"
+  register: _awg_obf_stat
+
+- name: Obfuscation | Generate a fresh random profile (first deploy)
+  ansible.builtin.set_fact:
+    _new_awg_obf:
+      awg_jc: "{{ range(4, 13) | random }}"
+      awg_jmin: "{{ range(80, 250) | random }}"
+      awg_jmax: "{{ range(800, 1200) | random }}"
+      awg_s1: "{{ range(5, 50) | random }}"
+      awg_s2: "{{ range(5, 50) | random }}"
+      awg_s3: "{{ range(5, 50) | random }}"
+      awg_s4: "{{ range(5, 28) | random }}"
+      # H1-H4 must be mutually distinct or amneziawg-tools rejects the config;
+      # draw each from its own non-overlapping quarter so collisions are impossible.
+      awg_h1: "{{ 268435473 + (469761979 | random) }}"
+      awg_h2: "{{ 738197452 + (469761979 | random) }}"
+      awg_h3: "{{ 1207959431 + (469761979 | random) }}"
+      awg_h4: "{{ 1677721410 + (469761979 | random) }}"
+  when: not _awg_obf_stat.stat.exists
+
+- name: Obfuscation | Persist the generated profile
+  ansible.builtin.copy:
+    content: "{{ _new_awg_obf | to_nice_yaml }}"
+    dest: "{{ awg_config_dir }}/obfuscation-params.yml"
+    mode: "0600"
+  when: not _awg_obf_stat.stat.exists
+
+- name: Obfuscation | Load the profile
+  ansible.builtin.slurp:
+    src: "{{ awg_config_dir }}/obfuscation-params.yml"
+  register: _awg_obf_raw
+
+- name: Obfuscation | Expose the profile as a fact
+  ansible.builtin.set_fact:
+    _awg_obfuscation: "{{ _awg_obf_raw.content | b64decode | from_yaml }}"

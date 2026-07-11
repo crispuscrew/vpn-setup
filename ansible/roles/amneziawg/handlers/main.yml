@@ -1,0 +1,4 @@
+- name: restart amneziawg
+  ansible.builtin.command:
+    cmd: docker compose restart
+    chdir: "{{ awg_compose_dir }}"

@@ -1,0 +1,14 @@
+- name: Open the AWG port (firewalld / RedHat)
+  ansible.posix.firewalld:
+    port: "{{ awg_port }}/udp"
+    permanent: true
+    immediate: true
+    state: enabled
+  when: ansible_os_family == 'RedHat'
+
+- name: Open the AWG port (ufw / Debian)
+  community.general.ufw:
+    rule: allow
+    port: "{{ awg_port }}"
+    proto: udp
+  when: ansible_os_family == 'Debian'

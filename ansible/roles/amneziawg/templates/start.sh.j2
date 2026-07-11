@@ -1,0 +1,28 @@
+#!/bin/sh
+# Managed by Ansible (vpn-setup) - AmneziaWG userspace server bring-up. Forces the
+# userspace implementation (amneziawg-go) since the container carries no kernel
+# module, then brings up awg0 and adds full-tunnel NAT out the default interface.
+export WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go
+
+awg-quick down /opt/amnezia/awg/awg0.conf 2>/dev/null || true
+if [ -f /opt/amnezia/awg/awg0.conf ]; then
+  awg-quick up /opt/amnezia/awg/awg0.conf
+fi
+
+ipt() { iptables -C "$@" 2>/dev/null || iptables -A "$@"; }
+ipt INPUT  -i awg0 -j ACCEPT
+ipt FORWARD -i awg0 -j ACCEPT
+ipt OUTPUT -o awg0 -j ACCEPT
+
+# Default-route interface: works on any VPS regardless of its name (eth0, ens3...).
+WAN=$(ip route show default | awk '/default/ {print $5; exit}')
+if [ -z "$WAN" ]; then
+  echo "ERROR: could not detect WAN interface, NAT skipped" >&2
+else
+  ipt FORWARD -i awg0 -o "$WAN" -s {{ awg_subnet }}.0/{{ awg_subnet_cidr }} -j ACCEPT
+  ipt FORWARD -i "$WAN" -o awg0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+  iptables -t nat -C POSTROUTING -s {{ awg_subnet }}.0/{{ awg_subnet_cidr }} -o "$WAN" -j MASQUERADE 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -s {{ awg_subnet }}.0/{{ awg_subnet_cidr }} -o "$WAN" -j MASQUERADE
+fi
+
+tail -f /dev/null
