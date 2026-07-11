@@ -59,8 +59,13 @@ func run() error {
 	}
 
 	bot, err := tele.NewBot(tele.Settings{
-		Token:   token,
-		Poller:  &tele.LongPoller{Timeout: 10 * time.Second},
+		Token: token,
+		// Request callback_query explicitly: with an empty list Telegram keeps the
+		// token's previous allowed_updates, which may omit button taps.
+		Poller: &tele.LongPoller{
+			Timeout:        10 * time.Second,
+			AllowedUpdates: []string{"message", "callback_query"},
+		},
 		OnError: func(err error, _ tele.Context) { log.Printf("handler error: %v", err) },
 	})
 	if err != nil {
@@ -74,15 +79,18 @@ func run() error {
 		botUsername:    bot.Me.Username,
 	}
 	bot.Handle("/start", application.onStart)
+	bot.Handle("/setup", application.onSetup)
 	bot.Handle("/help", application.onHelp)
 	bot.Handle("/add", application.onAdd)
 	bot.Handle("/list", application.onList)
 	bot.Handle("/revoke", application.onRevoke)
+	bot.Handle(&setupBtn, application.onSetupPick)
 
 	// Advertise the user-facing commands in Telegram's "/" menu; admin commands
 	// stay unlisted (they answer "Not authorised." for everyone else).
 	if err := bot.SetCommands([]tele.Command{
 		{Text: "start", Description: "Claim or re-show your subscription"},
+		{Text: "setup", Description: "How to connect on your device"},
 		{Text: "help", Description: "Show available commands"},
 	}); err != nil {
 		log.Printf("set commands: %v", err)

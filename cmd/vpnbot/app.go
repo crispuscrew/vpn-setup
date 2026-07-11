@@ -61,6 +61,7 @@ func (a *app) deliver(c tele.Context, username string) error {
 	if err != nil {
 		return err
 	}
-	caption := "Your VPN subscription. Import this link into your client, or scan the QR:\n\n" + user.SubscriptionURL
-	return c.Send(&tele.Photo{File: tele.FromReader(bytes.NewReader(png)), Caption: caption})
+	caption := "Your VPN subscription. Import this link into your client, or scan the QR:\n\n" +
+		user.SubscriptionURL + "\n\nNew here? Tap your device below for setup steps."
+	return c.Send(&tele.Photo{File: tele.FromReader(bytes.NewReader(png)), Caption: caption}, setupMenu())
 }

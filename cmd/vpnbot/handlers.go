@@ -28,6 +28,7 @@ func (a *app) onHelp(c tele.Context) error {
 	var out strings.Builder
 	out.WriteString("Commands:\n")
 	out.WriteString("/start <code> — claim your subscription (a bare /start re-shows it)\n")
+	out.WriteString("/setup — how to connect on your device\n")
 	out.WriteString("/help — show this message\n")
 	if a.isAdmin(c) {
 		out.WriteString("\nAdmin:\n")
