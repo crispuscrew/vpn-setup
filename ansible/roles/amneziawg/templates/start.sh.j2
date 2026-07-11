@@ -7,6 +7,13 @@ export WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go
 awg-quick down /opt/amnezia/awg/awg0.conf 2>/dev/null || true
 if [ -f /opt/amnezia/awg/awg0.conf ]; then
   awg-quick up /opt/amnezia/awg/awg0.conf
+  # Reconcile the reported listen port with the configured one. After a
+  # down->up->restart cycle amneziawg-go can keep the UDP socket bound to the
+  # right port yet report listen-port 0 via its UAPI - force the value so the
+  # device config and `awg show` agree. Idempotent: a no-op when already correct.
+  if [ "$(awg show awg0 listen-port 2>/dev/null)" != "{{ awg_port }}" ]; then
+    awg set awg0 listen-port {{ awg_port }}
+  fi
 fi
 
 ipt() { iptables -C "$@" 2>/dev/null || iptables -A "$@"; }
