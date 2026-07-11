@@ -54,3 +54,33 @@ func TestResolveInbounds(t *testing.T) {
 		t.Error("unknown tag: expected an error, got nil")
 	}
 }
+
+func TestResolveInboundsByNode(t *testing.T) {
+	// Every node runs the same VLESS_REALITY tag; a per-location service must
+	// select by node name, not tag.
+	inbounds := []panel.Inbound{
+		{ID: 1, Tag: "VLESS_REALITY", Node: panel.InboundNode{ID: 10, Name: "Estonia"}},
+		{ID: 2, Tag: "VLESS_REALITY", Node: panel.InboundNode{ID: 20, Name: "Russia"}},
+		{ID: 3, Tag: "VLESS_REALITY", Node: panel.InboundNode{ID: 30, Name: "Serbia"}},
+	}
+
+	ee, err := resolveInbounds(ServiceSpec{Name: "Estonia", Nodes: []string{"Estonia"}}, inbounds)
+	if err != nil {
+		t.Fatalf("one node: unexpected error: %v", err)
+	}
+	if !sameInts(ee, []int{1}) {
+		t.Errorf("one node: got %v want [1]", ee)
+	}
+
+	multi, err := resolveInbounds(ServiceSpec{Name: "eu", Nodes: []string{"Estonia", "Serbia"}}, inbounds)
+	if err != nil {
+		t.Fatalf("two nodes: unexpected error: %v", err)
+	}
+	if !sameInts(multi, []int{1, 3}) {
+		t.Errorf("two nodes: got %v want [1 3]", multi)
+	}
+
+	if _, err := resolveInbounds(ServiceSpec{Name: "x", Nodes: []string{"Mars"}}, inbounds); err == nil {
+		t.Error("unknown node: expected an error, got nil")
+	}
+}

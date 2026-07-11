@@ -38,10 +38,32 @@ func runApply(args []string) error {
 	return applyUsers(ctx, client, cfg.Users, serviceIDByName)
 }
 
-// resolveInbounds turns a spec's inbound tags (or "*") into a sorted id list. A tag
-// can match several inbounds when the same protocol runs on multiple nodes, so
-// every matching inbound id is included (not just one per tag).
+// resolveInbounds turns a spec into a sorted inbound id list. A spec selects
+// either by node name (every inbound on those nodes - per-location access) or by
+// inbound tag (or a single "*" for all). A tag can match several inbounds when the
+// same protocol runs on multiple nodes, so every match is included.
 func resolveInbounds(spec ServiceSpec, inbounds []panel.Inbound) ([]int, error) {
+	if len(spec.Nodes) > 0 {
+		wanted := make(map[string]bool, len(spec.Nodes))
+		for _, name := range spec.Nodes {
+			wanted[name] = true
+		}
+		seen := make(map[string]bool, len(spec.Nodes))
+		ids := make([]int, 0, len(inbounds))
+		for _, inbound := range inbounds {
+			if wanted[inbound.Node.Name] {
+				ids = append(ids, inbound.ID)
+				seen[inbound.Node.Name] = true
+			}
+		}
+		for name := range wanted {
+			if !seen[name] {
+				return nil, fmt.Errorf("service %q: no inbound on node %q", spec.Name, name)
+			}
+		}
+		sort.Ints(ids)
+		return ids, nil
+	}
 	if len(spec.Inbounds) == 1 && spec.Inbounds[0] == "*" {
 		ids := make([]int, 0, len(inbounds))
 		for _, inbound := range inbounds {

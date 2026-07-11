@@ -58,3 +58,30 @@ users:
 		t.Error("expected an error for a user with no services, got nil")
 	}
 }
+
+func TestLoadConfigNodesService(t *testing.T) {
+	path := writeTemp(t, `
+services:
+  - name: Estonia
+    nodes: ["Estonia"]
+`)
+	cfg, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	if len(cfg.Services) != 1 || len(cfg.Services[0].Nodes) != 1 || cfg.Services[0].Nodes[0] != "Estonia" {
+		t.Fatalf("nodes service parsed wrong: %+v", cfg.Services)
+	}
+}
+
+func TestLoadConfigRejectsBothSelectors(t *testing.T) {
+	path := writeTemp(t, `
+services:
+  - name: both
+    inbounds: ["*"]
+    nodes: ["Estonia"]
+`)
+	if _, err := loadConfig(path); err == nil {
+		t.Error("expected an error for a service setting both inbounds and nodes, got nil")
+	}
+}

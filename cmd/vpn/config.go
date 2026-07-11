@@ -15,11 +15,13 @@ type Config struct {
 	Users    []UserSpec    `yaml:"users"`
 }
 
-// ServiceSpec declares a service and the inbound tags it groups. A single entry
-// of "*" means every inbound the panel has discovered.
+// ServiceSpec declares a service and the inbounds it groups. Set exactly one of:
+// Inbounds (tags, or a single "*" for every discovered inbound) or Nodes (node
+// names, grouping every inbound on those nodes - used for per-location access).
 type ServiceSpec struct {
 	Name     string   `yaml:"name"`
 	Inbounds []string `yaml:"inbounds"`
+	Nodes    []string `yaml:"nodes"`
 }
 
 // UserSpec declares a user and the services (by name) granted to them.
@@ -50,8 +52,8 @@ func (c *Config) validate() error {
 		if service.Name == "" {
 			return fmt.Errorf("a service entry is missing its name")
 		}
-		if len(service.Inbounds) == 0 {
-			return fmt.Errorf("service %q lists no inbounds", service.Name)
+		if (len(service.Inbounds) > 0) == (len(service.Nodes) > 0) {
+			return fmt.Errorf("service %q must set exactly one of 'inbounds' or 'nodes'", service.Name)
 		}
 	}
 	for _, user := range c.Users {
