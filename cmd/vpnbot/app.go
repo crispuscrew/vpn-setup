@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -42,17 +43,18 @@ func newToken() (string, error) {
 
 // deliver sends username's subscription URL and its QR code to the current chat.
 func (a *app) deliver(c tele.Context, username string) error {
+	m := tr(a.langOf(c))
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
 
 	client, err := panel.FromEnv(ctx)
 	if err != nil {
-		return c.Send("The panel is unavailable right now - please try again later.")
+		return c.Send(m.panelDown)
 	}
 	user, err := client.User(ctx, username)
 	if err != nil {
 		if panel.NotFound(err) {
-			return c.Send("Your account was not found. Please contact your administrator.")
+			return c.Send(m.accountNotFound)
 		}
 		return err
 	}
@@ -60,7 +62,6 @@ func (a *app) deliver(c tele.Context, username string) error {
 	if err != nil {
 		return err
 	}
-	caption := "Your VPN subscription. Import this link into your client, or scan the QR:\n\n" +
-		user.SubscriptionURL + "\n\nNew here? Tap your device below for setup steps."
+	caption := fmt.Sprintf(m.deliverCaption, user.SubscriptionURL)
 	return c.Send(&tele.Photo{File: tele.FromReader(bytes.NewReader(png)), Caption: caption}, setupMenu())
 }

@@ -6,7 +6,7 @@ WORKDIR /src
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o /out/vpnbot ./cmd/vpnbot
 
-# CA roots for TLS to the Telegram API and the panel — the only thing the static
+# CA roots for TLS to the Telegram API and the panel - the only thing the static
 # binary needs from a base system.
 FROM docker.io/library/alpine:3.21 AS certs
 RUN apk add --no-cache ca-certificates

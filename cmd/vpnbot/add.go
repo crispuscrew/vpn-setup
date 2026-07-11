@@ -30,12 +30,13 @@ var (
 // the one-time claim link. A user's granted services are the source of truth, so
 // the toggles need no in-memory session state.
 func (a *app) onAdd(c tele.Context) error {
+	m := tr(a.langOf(c))
 	if !a.isAdmin(c) {
-		return c.Send("Not authorised.")
+		return c.Send(m.notAuthorised)
 	}
 	args := c.Args()
 	if len(args) != 1 {
-		return c.Send("usage: /add <username>")
+		return c.Send(m.addUsage)
 	}
 	username := strings.ToLower(args[0])
 
@@ -43,29 +44,29 @@ func (a *app) onAdd(c tele.Context) error {
 	defer cancel()
 	client, err := panel.FromEnv(ctx)
 	if err != nil {
-		return c.Send("The panel is unavailable right now - please try again later.")
+		return c.Send(m.panelDown)
 	}
 	if _, err := client.User(ctx, username); panel.NotFound(err) {
 		if _, err := client.CreateUser(ctx, username, panel.ExpireNever, []int{}, ""); err != nil {
-			return c.Send("Could not create user: " + err.Error())
+			return c.Send(fmt.Sprintf(m.addCreateFail, err.Error()))
 		}
 	} else if err != nil {
 		return err
 	}
 
-	markup, err := a.locationMarkup(ctx, client, username)
+	markup, err := a.locationMarkup(ctx, client, username, a.langOf(c))
 	if err != nil {
-		return c.Send(err.Error())
+		return c.Send(m.panelDown)
 	}
-	return c.Send(fmt.Sprintf("Grant locations for %s, then tap Done:", username), markup)
+	return c.Send(fmt.Sprintf(m.addGrantPrompt, username), markup)
 }
 
 // locationMarkup fetches the services and the user's current grants and builds the
 // toggle keyboard: every service, checked when granted, plus a Done button.
-func (a *app) locationMarkup(ctx context.Context, client *panel.Client, username string) (*tele.ReplyMarkup, error) {
+func (a *app) locationMarkup(ctx context.Context, client *panel.Client, username string, l lang) (*tele.ReplyMarkup, error) {
 	services, err := client.Services(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("panel unavailable: %w", err)
+		return nil, err
 	}
 	user, err := client.User(ctx, username)
 	if err != nil {
@@ -75,10 +76,10 @@ func (a *app) locationMarkup(ctx context.Context, client *panel.Client, username
 	for _, id := range user.ServiceIDs {
 		granted[id] = true
 	}
-	return buildLocationMarkup(username, services, granted), nil
+	return buildLocationMarkup(username, services, granted, tr(l).btnDone), nil
 }
 
-func buildLocationMarkup(username string, services []panel.Service, granted map[int]bool) *tele.ReplyMarkup {
+func buildLocationMarkup(username string, services []panel.Service, granted map[int]bool, doneLabel string) *tele.ReplyMarkup {
 	markup := &tele.ReplyMarkup{}
 	btns := make([]tele.Btn, 0, len(services))
 	for _, svc := range services {
@@ -96,51 +97,53 @@ func buildLocationMarkup(username string, services []panel.Service, granted map[
 			rows = append(rows, markup.Row(btns[i]))
 		}
 	}
-	rows = append(rows, markup.Row(markup.Data("✅ Done", addDoneUnique, username)))
+	rows = append(rows, markup.Row(markup.Data(doneLabel, addDoneUnique, username)))
 	markup.Inline(rows...)
 	return markup
 }
 
 // onAddToggle flips one service on the user and redraws the picker's checkmarks.
 func (a *app) onAddToggle(c tele.Context) error {
+	m := tr(a.langOf(c))
 	if !a.isAdmin(c) {
-		return c.Respond(&tele.CallbackResponse{Text: "Not authorised."})
+		return c.Respond(&tele.CallbackResponse{Text: m.notAuthorised})
 	}
 	username, serviceID, ok := parseUserService(c.Data())
 	if !ok {
-		return c.Respond(&tele.CallbackResponse{Text: "Bad request"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addBadRequest})
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
 	client, err := panel.FromEnv(ctx)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Panel unavailable"})
+		return c.Respond(&tele.CallbackResponse{Text: m.panelShort})
 	}
 	user, err := client.User(ctx, username)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "No such user"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addNoUser})
 	}
 	next, added := toggleID(user.ServiceIDs, serviceID)
 	if _, err := client.UpdateUser(ctx, username, user.ExpireStrategy, next); err != nil {
 		log.Printf("add toggle %s service %d: %v", username, serviceID, err)
-		return c.Respond(&tele.CallbackResponse{Text: "Update failed"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addUpdateFail})
 	}
 
-	if markup, err := a.locationMarkup(ctx, client, username); err == nil {
+	if markup, err := a.locationMarkup(ctx, client, username, a.langOf(c)); err == nil {
 		_ = c.Edit(markup)
 	}
 	if added {
-		return c.Respond(&tele.CallbackResponse{Text: "Granted"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addGranted})
 	}
-	return c.Respond(&tele.CallbackResponse{Text: "Removed"})
+	return c.Respond(&tele.CallbackResponse{Text: m.addRemoved})
 }
 
 // onAddDone issues the one-time claim link once at least one location is granted,
 // reusing the user's existing token if they were added before.
 func (a *app) onAddDone(c tele.Context) error {
+	m := tr(a.langOf(c))
 	if !a.isAdmin(c) {
-		return c.Respond(&tele.CallbackResponse{Text: "Not authorised."})
+		return c.Respond(&tele.CallbackResponse{Text: m.notAuthorised})
 	}
 	username := c.Data()
 
@@ -148,29 +151,28 @@ func (a *app) onAddDone(c tele.Context) error {
 	defer cancel()
 	client, err := panel.FromEnv(ctx)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Panel unavailable"})
+		return c.Respond(&tele.CallbackResponse{Text: m.panelShort})
 	}
 	user, err := client.User(ctx, username)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "No such user"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addNoUser})
 	}
 	if len(user.ServiceIDs) == 0 {
-		return c.Respond(&tele.CallbackResponse{Text: "Pick at least one location first"})
+		return c.Respond(&tele.CallbackResponse{Text: m.addPickFirst})
 	}
 
 	token, err := a.tokenFor(username)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: err.Error()})
+		return c.Respond(&tele.CallbackResponse{Text: m.panelShort})
 	}
 	locations, err := grantedNames(ctx, client, user.ServiceIDs)
 	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Panel unavailable"})
+		return c.Respond(&tele.CallbackResponse{Text: m.panelShort})
 	}
 
 	link := fmt.Sprintf("https://t.me/%s?start=%s", a.botUsername, token)
 	_ = c.Respond()
-	return c.Edit(fmt.Sprintf("Created %s (%s).\nSend them this link:\n%s\n\n(or the code: %s)",
-		username, strings.Join(locations, ", "), link, token), &tele.ReplyMarkup{})
+	return c.Edit(fmt.Sprintf(m.addDone, username, strings.Join(locations, ", "), link, token), &tele.ReplyMarkup{})
 }
 
 // tokenFor returns the user's existing claim token, or mints and records a new one.
