@@ -2,6 +2,14 @@
 # for panel_domain, proxying HTTPS to the panel's loopback port. Runs only when a
 # domain is set (see site.yml). Caddy runs as a pinned container, like the rest of
 # the stack, host-networked so it owns 80/443 and reaches the panel on 127.0.0.1.
+- name: Caddy needs 443, so a co-located node must not use it for Reality
+  ansible.builtin.assert:
+    that: (reality_port | int) != 443
+    fail_msg: >-
+      panel_domain is set, so Caddy needs port 443 on this host, but reality_port
+      is 443. Set reality_port to another port (e.g. 8443) for the panel host in
+      your inventory so the local node's Reality inbound does not collide with it.
+
 - name: Ensure Caddy directories
   ansible.builtin.file:
     path: "{{ item }}"
