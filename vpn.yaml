@@ -23,7 +23,6 @@ services:
   - name: USA
     nodes: ["USA"]
 
-users:
-  - username: testuser
-    services: ["all"]
-    expire_strategy: never
+# Real users are provisioned by the bot's admin /add, not declared here. Add an
+# entry only to manage a user as code (reconcile is additive - it never prunes).
+users: []
