@@ -57,9 +57,12 @@
     mode: "0644"
   notify: restart marznode
 
-- name: Set up Hysteria2 + TUIC core configs (cert, obfs, config files)
+- name: Set up the shared TLS cert and the Hysteria2/TUIC core configs
   ansible.builtin.include_tasks: extra_protocols.yml
-  when: (hysteria2_enabled | default(false) | bool) or (tuic_enabled | default(false) | bool)
+  when: >-
+    (hysteria2_enabled | default(false) | bool)
+    or (tuic_enabled | default(false) | bool)
+    or (trojan_enabled | default(false) | bool)
 
 - name: Render the marznode env
   ansible.builtin.template:

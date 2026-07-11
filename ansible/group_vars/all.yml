@@ -47,6 +47,8 @@ marznode_port: 53042         # panel ↔ marznode gRPC (secure, panel-cert authe
 reality_port: 443            # VLESS-Reality (needs no domain)
 hysteria2_port: 8443         # Hysteria2 (UDP)
 tuic_port: 8444              # TUIC (UDP, via sing-box)
+shadowsocks_port: 8388       # Shadowsocks (TCP+UDP)
+trojan_port: 8445            # Trojan (TCP, TLS)
 
 # ── Hysteria2 + TUIC ──────────────────────────────────────────────────────────
 # Both are UDP protocols that require TLS but the nodes have no per-node domain, so
@@ -57,8 +59,16 @@ tuic_port: 8444              # TUIC (UDP, via sing-box)
 # Give a node a real domain + cert to drop `allowinsecure` later. Toggle per host.
 hysteria2_enabled: true
 tuic_enabled: true
+# Trojan also needs TLS and shares the same per-node self-signed cert + SNI +
+# allowinsecure story (it just rides xray over TCP instead of a UDP core).
+trojan_enabled: true
 # SNI presented in the TLS handshake (blending only; the cert is self-signed).
 tls_sni: "www.bing.com"
+
+# Shadowsocks is plaintext (its own AEAD, no TLS/domain), so it needs none of the
+# above - just an xray inbound and an open port. Cipher is chosen per user by the
+# panel (classic AEAD: aes-128-gcm / aes-256-gcm / chacha20-ietf-poly1305).
+shadowsocks_enabled: true
 
 # VLESS-Reality borrow target (dest + serverNames). Must be a real, reachable
 # TLS 1.3 + X25519 site whose handshake xray can proxy. Verified good defaults:

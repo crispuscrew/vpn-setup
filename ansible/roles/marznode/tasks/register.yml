@@ -115,9 +115,13 @@
     # {USERNAME}/{PROTOCOL} are Marzneshin template vars rendered per user at
     # subscription time; only {{ _node_label }} is filled in here.
     _host_remark: "{{ _node_label }} ({USERNAME}) [{PROTOCOL}]"
-    # Hysteria2/TUIC ride a self-signed cert, so their links must skip cert
-    # verification and carry the blending SNI; other protocols get nothing extra.
-    _tls_extra: "{{ {'allowinsecure': true, 'sni': tls_sni, 'alpn': 'h3'} if item.protocol in ['hysteria2', 'tuic'] else {} }}"
+    # Protocols on the self-signed cert must skip cert verification in their link and
+    # carry the blending SNI. Hysteria2/TUIC are HTTP/3 (alpn h3); Trojan is TCP TLS
+    # (alpn http/1.1). Everything else (Reality, Shadowsocks) gets nothing extra.
+    _tls_extra: >-
+      {{ {'allowinsecure': true, 'sni': tls_sni, 'alpn': 'h3'} if item.protocol in ['hysteria2', 'tuic']
+         else {'allowinsecure': true, 'sni': tls_sni, 'alpn': 'http/1.1'} if item.protocol == 'trojan'
+         else {} }}
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts/{{ item.id }}"
     method: PUT
@@ -131,4 +135,4 @@
   delegate_to: "{{ _panel_host }}"
   when: >-
     item.address != ansible_host or item.remark != _host_remark
-    or (item.protocol in ['hysteria2', 'tuic'] and not (item.allowinsecure | default(false)))
+    or (item.protocol in ['hysteria2', 'tuic', 'trojan'] and not (item.allowinsecure | default(false)))

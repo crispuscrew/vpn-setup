@@ -136,17 +136,25 @@ scope a user to one node. The bot's `/add` picker grants any subset of these.
 
 ### Protocols
 
-Each node runs three cores: **VLESS+Reality** (TCP), **Hysteria2** (UDP, port 8443),
-and **TUIC** (UDP, port 8444, via sing-box). Hysteria2 and TUIC are toggled with
-`hysteria2_enabled` / `tuic_enabled` (default on) and share a per-node self-signed
-cert, so their subscription links set `allowinsecure` (see the note in `group_vars`).
-All three are discovered by the panel automatically and added to a user's
-subscription by `vpn apply` (the `all` and per-location services pick them up). A
-client that reads the subscription (Hiddify, sing-box, v2rayN) offers all of them and
-auto-selects the fastest.
+Each node exposes five protocols, all folded into the one subscription:
+
+- **VLESS+Reality** (TCP) - needs no domain or cert.
+- **Hysteria2** (UDP, port 8443) - `hysteria2_enabled`.
+- **TUIC** (UDP, port 8444, via sing-box) - `tuic_enabled`.
+- **Trojan** (TCP, port 8445, via xray) - `trojan_enabled`.
+- **Shadowsocks** (TCP+UDP, port 8388, via xray) - `shadowsocks_enabled`. Plaintext
+  AEAD (its own encryption), so it needs no TLS or domain; the cipher is chosen per
+  user by the panel.
+
+Hysteria2, TUIC, and Trojan all need TLS but the nodes carry no per-node domain, so
+they share one per-node self-signed cert and their subscription links set
+`allowinsecure` (see the note in `group_vars`). Every protocol is toggled per host
+(default on) and discovered by the panel automatically. A client that reads the
+subscription (Hiddify, sing-box, v2rayN) offers all of them and auto-selects the
+fastest.
 
 After enabling a new protocol on nodes, run `vpn apply` once so the services include
-the newly discovered inbounds.
+the newly discovered inbounds (the `all` and per-location services pick them up).
 
 ## 6. Run the delivery bot
 
