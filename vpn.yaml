@@ -1,17 +1,23 @@
-# vpn.yaml — desired Marzneshin panel state, applied with `vpn apply -f vpn.yaml`.
+# vpn.yaml - desired Marzneshin panel state, applied with `vpn apply -f vpn.yaml`.
 #
 # Protocols/inbounds themselves are defined by Ansible in each node's core config
 # files; this file only groups the discovered inbounds into services and grants
 # users. Panel URL and sudo-admin credentials come from the environment
-# (VPN_PANEL_URL / VPN_PANEL_USERNAME / VPN_PANEL_PASSWORD) — never from this file.
+# (VPN_PANEL_URL / VPN_PANEL_USERNAME / VPN_PANEL_PASSWORD) - never from this file.
 #
 # Reconcile is convergent and additive: it creates or updates what is declared and
 # leaves anything else on the panel untouched (no pruning).
 
 services:
-  # One service exposing every protocol the nodes currently advertise.
+  # One service exposing every inbound on every node.
   - name: all
     inbounds: ["*"]
+  # Per-location services grant access to a single node, selected by its panel
+  # node name. The bot's /add picker grants any subset of these to a user.
+  - name: Estonia
+    nodes: ["Estonia"]
+  - name: Russia
+    nodes: ["Russia"]
 
 users:
   - username: testuser
