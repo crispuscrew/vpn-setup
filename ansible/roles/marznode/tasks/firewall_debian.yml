@@ -19,6 +19,20 @@
     port: "{{ reality_port }}"
     proto: tcp
 
+- name: Allow the Hysteria2 port (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ hysteria2_port }}"
+    proto: udp
+  when: hysteria2_enabled | default(false) | bool
+
+- name: Allow the TUIC port (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ tuic_port }}"
+    proto: udp
+  when: tuic_enabled | default(false) | bool
+
 - name: Enable ufw (default deny incoming, allow outgoing)
   community.general.ufw:
     state: enabled

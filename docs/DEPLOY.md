@@ -134,6 +134,20 @@ re-apply:
 The `all` service (`inbounds: ["*"]`) always spans every node; per-location services
 scope a user to one node. The bot's `/add` picker grants any subset of these.
 
+### Protocols
+
+Each node runs three cores: **VLESS+Reality** (TCP), **Hysteria2** (UDP, port 8443),
+and **TUIC** (UDP, port 8444, via sing-box). Hysteria2 and TUIC are toggled with
+`hysteria2_enabled` / `tuic_enabled` (default on) and share a per-node self-signed
+cert, so their subscription links set `allowinsecure` (see the note in `group_vars`).
+All three are discovered by the panel automatically and added to a user's
+subscription by `vpn apply` (the `all` and per-location services pick them up). A
+client that reads the subscription (Hiddify, sing-box, v2rayN) offers all of them and
+auto-selects the fastest.
+
+After enabling a new protocol on nodes, run `vpn apply` once so the services include
+the newly discovered inbounds.
+
 ## 6. Run the delivery bot
 
 Create a bot with @BotFather for the token, and get your numeric Telegram id (for

@@ -1,0 +1,15 @@
+# Managed by Ansible (vpn-setup). Hysteria2 core config for marznode. marznode
+# injects `auth` (per-user, HTTP to itself) and `trafficStats`; users are
+# provisioned by the panel, so none are listed here. Self-signed TLS plus salamander
+# obfs: without the obfs password the port silently drops every packet, so it reads
+# as closed to a prober.
+listen: ":{{ hysteria2_port }}"
+
+tls:
+  cert: {{ marznode_dir }}/tls_cert.pem
+  key: {{ marznode_dir }}/tls_key.pem
+
+obfs:
+  type: salamander
+  salamander:
+    password: "{{ hysteria2_obfs_password }}"

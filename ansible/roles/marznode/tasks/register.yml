@@ -115,15 +115,20 @@
     # {USERNAME}/{PROTOCOL} are Marzneshin template vars rendered per user at
     # subscription time; only {{ _node_label }} is filled in here.
     _host_remark: "{{ _node_label }} ({USERNAME}) [{PROTOCOL}]"
+    # Hysteria2/TUIC ride a self-signed cert, so their links must skip cert
+    # verification and carry the blending SNI; other protocols get nothing extra.
+    _tls_extra: "{{ {'allowinsecure': true, 'sni': tls_sni, 'alpn': 'h3'} if item.protocol in ['hysteria2', 'tuic'] else {} }}"
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts/{{ item.id }}"
     method: PUT
     headers:
       Authorization: "Bearer {{ _tok.json.access_token }}"
     body_format: json
-    body: "{{ item | combine({'address': ansible_host, 'remark': _host_remark}) }}"
+    body: "{{ item | combine({'address': ansible_host, 'remark': _host_remark}, _tls_extra) }}"
   loop: "{{ _hosts.json['items'] | selectattr('inbound_id', 'in', _node_status.json.inbound_ids | default([])) | list }}"
   loop_control:
     label: "host {{ item.id }} -> {{ ansible_host }} ({{ _node_label }})"
   delegate_to: "{{ _panel_host }}"
-  when: item.address != ansible_host or item.remark != _host_remark
+  when: >-
+    item.address != ansible_host or item.remark != _host_remark
+    or (item.protocol in ['hysteria2', 'tuic'] and not (item.allowinsecure | default(false)))

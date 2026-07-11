@@ -1,0 +1,56 @@
+# Hysteria2 (UDP) and TUIC (UDP, via sing-box) both need TLS but the nodes carry no
+# per-node domain, so they share one self-signed cert generated here once and
+# reused. The subscription links set allowinsecure (see register.yml).
+- name: Check for the self-signed TLS cert
+  ansible.builtin.stat:
+    path: "{{ marznode_dir }}/tls_cert.pem"
+  register: _tls_stat
+
+- name: Generate a self-signed TLS cert (EC P-256)
+  ansible.builtin.command: >
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1
+    -keyout {{ marznode_dir }}/tls_key.pem -out {{ marznode_dir }}/tls_cert.pem
+    -days 3650 -nodes -subj "/CN={{ tls_sni }}"
+  args:
+    creates: "{{ marznode_dir }}/tls_cert.pem"
+  when: not _tls_stat.stat.exists
+
+- name: Secure the TLS key
+  ansible.builtin.file:
+    path: "{{ marznode_dir }}/tls_key.pem"
+    mode: "0600"
+
+# Salamander obfs password: generated once and carried into the sub link. Hex so it
+# is safe in YAML and URLs.
+- name: Generate the Hysteria2 obfs password
+  ansible.builtin.shell: "openssl rand -hex 16 > {{ marznode_dir }}/hysteria2_obfs.txt"
+  args:
+    creates: "{{ marznode_dir }}/hysteria2_obfs.txt"
+  when: hysteria2_enabled | default(false) | bool
+
+- name: Load the Hysteria2 obfs password
+  ansible.builtin.slurp:
+    src: "{{ marznode_dir }}/hysteria2_obfs.txt"
+  register: _obfs_raw
+  when: hysteria2_enabled | default(false) | bool
+
+- name: Expose the obfs password as a fact
+  ansible.builtin.set_fact:
+    hysteria2_obfs_password: "{{ _obfs_raw.content | b64decode | trim }}"
+  when: hysteria2_enabled | default(false) | bool
+
+- name: Render the Hysteria2 core config
+  ansible.builtin.template:
+    src: hysteria2.yaml.j2
+    dest: "{{ marznode_dir }}/hysteria2.yaml"
+    mode: "0644"
+  when: hysteria2_enabled | default(false) | bool
+  notify: restart marznode
+
+- name: Render the sing-box core config (TUIC)
+  ansible.builtin.template:
+    src: singbox_config.json.j2
+    dest: "{{ marznode_dir }}/singbox_config.json"
+    mode: "0644"
+  when: tuic_enabled | default(false) | bool
+  notify: restart marznode
