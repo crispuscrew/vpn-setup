@@ -1,0 +1,4 @@
+- name: restart vpnbot
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: "{{ vpnbot_compose_dir }}"

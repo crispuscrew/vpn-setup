@@ -16,6 +16,9 @@ all:
           node_label: "🇪🇪 Estonia"           # prettier name users see in their client
           # reality_port: 8443               # required if panel_domain is set: Caddy takes 443,
           #                                  # so this host's local node uses another port
+          # vpnbot_enabled: true             # run the Telegram delivery bot on the panel host
+          # vpnbot_admins: "123456789"       # Telegram admin id(s), comma-separated
+          #                                  # (needs .secrets/vpnbot_token.txt on the control node)
     nodes:
       hosts:
         vps2:

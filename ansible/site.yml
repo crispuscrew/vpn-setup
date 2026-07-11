@@ -1,3 +1,28 @@
+# Mint the vpnbot's restricted SSH key on the control node before any host play,
+# so the amneziawg role can authorise it (forced command) on every AWG node. Runs
+# only when some host opts in with vpnbot_enabled; the key is reused on re-runs.
+- name: Control node - vpnbot SSH key
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _bot_hosts: "{{ groups['all'] | map('extract', hostvars)
+                    | selectattr('vpnbot_enabled', 'defined')
+                    | selectattr('vpnbot_enabled') | list }}"
+    _key_path: "{{ playbook_dir }}/.secrets/vpnbot_ssh"
+  tasks:
+    - name: Ensure the secrets directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/.secrets"
+        state: directory
+        mode: "0700"
+      when: _bot_hosts | length > 0
+
+    - name: Generate the vpnbot restricted keypair (ed25519, once)
+      ansible.builtin.command:
+        cmd: "ssh-keygen -t ed25519 -N '' -C vpnbot-awg -f {{ _key_path }}"
+        creates: "{{ _key_path }}"
+      when: _bot_hosts | length > 0
+
 # Panel host runs the panel plus an all-in-one (loopback) node; any hosts in the
 # `nodes` group run a marznode that connects back to the panel over mutual TLS.
 - name: Panel host - panel plus an all-in-one node
@@ -15,6 +40,8 @@
       when: panel_domain | default('') | length > 0
     - role: amneziawg
       when: awg_enabled | default(false) | bool
+    - role: vpnbot
+      when: vpnbot_enabled | default(false) | bool
 
 - name: Node hosts - a marznode connected to the panel over TLS
   hosts: nodes

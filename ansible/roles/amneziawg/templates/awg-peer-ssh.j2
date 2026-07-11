@@ -1,0 +1,12 @@
+#!/bin/sh
+# Managed by Ansible (vpn-setup). Forced command for the vpnbot's restricted SSH
+# key: whatever the client asks for, only awg-peer runs. The client's requested
+# command arrives in SSH_ORIGINAL_COMMAND; strip a leading awg-peer path and hand
+# the rest to the real agent, which validates every argument itself.
+set -f
+# shellcheck disable=SC2086  # deliberate word-split of the fixed-charset command
+set -- ${SSH_ORIGINAL_COMMAND:-}
+case "${1:-}" in
+  */awg-peer|awg-peer) shift ;;
+esac
+exec {{ awg_peer_script }} "$@"
