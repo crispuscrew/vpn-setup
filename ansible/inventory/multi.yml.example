@@ -14,6 +14,8 @@ all:
           ansible_host: "203.0.113.10"       # panel + all-in-one node
           location: "Estonia"                # panel node name; per-location services select on it
           node_label: "🇪🇪 Estonia"           # prettier name users see in their client
+          # reality_port: 8443               # required if panel_domain is set: Caddy takes 443,
+          #                                  # so this host's local node uses another port
     nodes:
       hosts:
         vps2:

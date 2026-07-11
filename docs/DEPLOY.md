@@ -83,6 +83,11 @@ public plain-HTTP port is closed. Subscription links switch to
 (for example a `*.duckdns.org` subdomain). Point the `vpn` CLI and the bot at
 `https://<domain>` instead of the IP once this is on.
 
+Because the all-in-one panel host also runs a node whose Reality inbound defaults
+to 443, and Caddy needs 443 for HTTPS, set that host's `reality_port` to another
+port (for example 8443) in the inventory. The play refuses to continue otherwise.
+Dedicated nodes keep 443.
+
 ## 4. Apply the panel config-as-code
 
 `vpn` reads the panel URL and admin credentials from the environment, never from
