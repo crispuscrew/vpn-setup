@@ -12,12 +12,15 @@ all:
       hosts:
         vps:
           ansible_host: "203.0.113.10"       # panel + all-in-one node
+          node_label: "node1"                # server name users see in their client
     nodes:
       hosts:
         vps2:
           ansible_host: "203.0.113.20"       # extra marznode; reachable from the panel
+          node_label: "node2"                # distinct label so the servers are told apart
         # vps3:
         #   ansible_host: "203.0.113.30"
+        #   node_label: "node3"
   vars:
     ansible_user: root
     ansible_ssh_private_key_file: "~/.ssh/vpn-setup"

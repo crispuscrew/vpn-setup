@@ -7,6 +7,9 @@
     _node_address: "{{ '127.0.0.1' if node_mode == 'local' else ansible_host }}"
     _node_backend: "{{ 'grpcio' if node_mode == 'local' else 'grpclib' }}"
     _node_name: "{{ node_name | default('local' if node_mode == 'local' else inventory_hostname) }}"
+    # User-facing server name shown in clients. Distinct per node so the several
+    # servers a subscription spans are told apart in the auto-select list.
+    _node_label: "{{ node_label | default(inventory_hostname) }}"
 
 - name: Authenticate to the panel
   ansible.builtin.uri:
@@ -93,8 +96,9 @@
       backends={{ _node_status.json.backends | map(attribute='name') | list }}
 
 # A default host uses {SERVER_IP}, which resolves to the panel's address for every
-# node — wrong for a separate node host. Point each of this node's hosts at the
-# node's own public address so multi-node subscriptions reach the right box.
+# node (wrong for a separate node host), and a fixed remark, so every node shows
+# the same name in a client. Point each of this node's hosts at the node's own
+# public address and give it this node's label so the servers are told apart.
 - name: List inbound hosts
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts"
@@ -103,16 +107,20 @@
   register: _hosts
   delegate_to: "{{ _panel_host }}"
 
-- name: Point this node's hosts at its public address
+- name: Name this node's hosts and point them at its public address
+  vars:
+    # {USERNAME}/{PROTOCOL} are Marzneshin template vars rendered per user at
+    # subscription time; only {{ _node_label }} is filled in here.
+    _host_remark: "🚀 {{ _node_label }} ({USERNAME}) [{PROTOCOL}]"
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts/{{ item.id }}"
     method: PUT
     headers:
       Authorization: "Bearer {{ _tok.json.access_token }}"
     body_format: json
-    body: "{{ item | combine({'address': ansible_host}) }}"
+    body: "{{ item | combine({'address': ansible_host, 'remark': _host_remark}) }}"
   loop: "{{ _hosts.json['items'] | selectattr('inbound_id', 'in', _node_status.json.inbound_ids | default([])) | list }}"
   loop_control:
-    label: "host {{ item.id }} -> {{ ansible_host }}"
+    label: "host {{ item.id }} -> {{ ansible_host }} ({{ _node_label }})"
   delegate_to: "{{ _panel_host }}"
-  when: item.address != ansible_host
+  when: item.address != ansible_host or item.remark != _host_remark

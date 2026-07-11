@@ -11,6 +11,7 @@ all:
       hosts:
         vps:
           ansible_host: "203.0.113.10"       # your VPS IP
+          # node_label: "node1"              # optional: server name users see in their client
   vars:
     ansible_user: root
     ansible_ssh_private_key_file: "~/.ssh/vpn-setup"
