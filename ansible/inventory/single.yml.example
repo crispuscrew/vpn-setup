@@ -21,11 +21,12 @@ all:
     # Subscription links are built from this. With a domain use the FQDN + TLS;
     # with no domain (IP-only test mode) leave panel_domain empty and links use
     # http://<ip>:<panel_port>.
-    panel_domain: ""                         # e.g. "vpn.example.com"; empty = IP-only
+    panel_domain: ""                         # set a domain (DNS A-record -> this host) for
+                                             # automatic HTTPS via Caddy; empty = IP-only HTTP
     panel_port: 8000
 
     # SNI that VLESS-Reality impersonates when there is no owned domain. Pick a real,
     # reachable TLS 1.3 + X25519 site that is not blocked in the target region.
     # Verified-working: dl.google.com, www.google.com, www.cloudflare.com.
-    # AVOID www.microsoft.com — its edge negotiates a handshake xray cannot borrow.
+    # AVOID www.microsoft.com - its edge negotiates a handshake xray cannot borrow.
     reality_sni: "dl.google.com"

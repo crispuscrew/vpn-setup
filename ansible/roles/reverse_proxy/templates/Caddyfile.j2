@@ -1,0 +1,8 @@
+{# Managed by Ansible (vpn-setup). Automatic HTTPS: naming the site triggers a
+   Let's Encrypt cert, and reverse_proxy sends traffic to the panel on loopback. #}
+{{ panel_domain }} {
+    reverse_proxy 127.0.0.1:{{ panel_port }}
+{% if acme_email | default('') | length > 0 %}
+    tls {{ acme_email }}
+{% endif %}
+}

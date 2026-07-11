@@ -69,8 +69,19 @@ generates a sudo admin once and stores its password on your control machine unde
 password stays stable. The play waits until the node reports healthy before
 finishing.
 
-Reach the panel at `http://<panel-ip>:8000` (or `https://<domain>` behind your own
-TLS). Swagger is at `/docs` while `panel_docs` is true.
+Reach the panel at `http://<panel-ip>:8000` (or `https://<domain>` once TLS is set
+up below). Swagger is at `/docs` while `panel_docs` is true.
+
+### HTTPS (recommended for real use)
+
+Set `panel_domain` in the inventory to a hostname whose DNS A-record points at the
+panel host, then re-run `site.yml`. When a domain is set, the playbook runs a
+Caddy reverse proxy on the panel host that gets an automatic Let's Encrypt
+certificate, terminates HTTPS on 443, and proxies to the panel over loopback; the
+public plain-HTTP port is closed. Subscription links switch to
+`https://<domain>/sub/...` automatically. Any hostname works, including a free one
+(for example a `*.duckdns.org` subdomain). Point the `vpn` CLI and the bot at
+`https://<domain>` instead of the IP once this is on.
 
 ## 4. Apply the panel config-as-code
 
