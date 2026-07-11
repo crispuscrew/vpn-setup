@@ -35,7 +35,8 @@ type Entry struct {
 }
 
 type state struct {
-	Entries []Entry `json:"entries"`
+	Entries []Entry          `json:"entries"`
+	Langs   map[int64]string `json:"langs,omitempty"`
 }
 
 // Ledger is a set of claim entries backed by a JSON file.
@@ -102,6 +103,25 @@ func (l *Ledger) Claim(token string, chatID int64) (Entry, bool, error) {
 		return l.data.Entries[i], first, nil
 	}
 	return Entry{}, false, ErrNotFound
+}
+
+// Lang returns a chat's saved language override, if one was set with /lang.
+func (l *Ledger) Lang(chatID int64) (string, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	code, ok := l.data.Langs[chatID]
+	return code, ok
+}
+
+// SetLang records a chat's language override.
+func (l *Ledger) SetLang(chatID int64, code string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.data.Langs == nil {
+		l.data.Langs = make(map[int64]string)
+	}
+	l.data.Langs[chatID] = code
+	return l.save()
 }
 
 // ByUsername returns the entry tracked for a panel username, if any.

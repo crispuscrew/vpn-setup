@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	tele "gopkg.in/telebot.v3"
 
@@ -10,64 +11,14 @@ import (
 
 const setupUnique = "setup"
 
-// multiServerNote is appended to every platform's steps: the subscription carries
-// all of our nodes, and clients group them so the fastest is used automatically.
-const multiServerNote = `ℹ️ Using several servers
-We run more than one server, and they are all in your subscription. In your app pick "Auto" / "Best Latency" (a group, not a single server) to always use the fastest one. It switches over on its own if a server goes down. You can still pick a specific server by name.`
-
-// platforms drives the picker layout (order + labels) and holds the per-platform
-// setup steps. Every client below imports a standard subscription link.
-var platforms = []struct{ key, label, steps string }{
-	{"ios", "🍎 iOS", `🍎 iOS setup
-
-Recommended app: Streisand (free) or Hiddify, both on the App Store.
-
-1. Install Streisand from the App Store.
-2. Copy your subscription link (send /start if you need it again).
-3. Open Streisand, tap ＋ (top-right), then "Add from Clipboard".
-   Or tap ＋ → "Scan QR Code" and scan the QR from your /start message.
-4. Select the config and tap Connect.`},
-
-	{"android", "🤖 Android", `🤖 Android setup
-
-Recommended app: Hiddify or v2rayNG (both free).
-
-1. Install Hiddify from Google Play, or v2rayNG from GitHub.
-2. Copy your subscription link (send /start if you need it again).
-3. Open the app, tap ＋, then "Add from clipboard" / "Import from link".
-   Or tap ＋ → "Scan QR code" and scan the QR from your /start message.
-4. Tap the power button to connect.`},
-
-	{"windows", "🪟 Windows", `🪟 Windows setup
-
-Recommended app: Hiddify (hiddify.com) or v2rayN.
-
-1. Download and run Hiddify for Windows.
-2. Copy your subscription link (send /start if you need it again).
-3. In Hiddify: New Profile → paste the link → Add.
-4. Select the profile and click Connect.`},
-
-	{"macos", "💻 macOS", `💻 macOS setup
-
-Recommended app: Hiddify (hiddify.com), Apple Silicon and Intel.
-
-1. Install Hiddify for macOS.
-2. Copy your subscription link (send /start if you need it again).
-3. In Hiddify: New Profile → paste the link → Add.
-4. Select the profile and click Connect.`},
-
-	{"linux", "🐧 Linux", `🐧 Linux setup
-
-Recommended app: Hiddify (AppImage from hiddify.com), or the sing-box CLI.
-
-Hiddify:
-1. Download the Hiddify AppImage, make it executable, and run it.
-2. New Profile → paste your subscription link → Add → Connect.
-
-sing-box (CLI): append /sing-box to your link and run:
-  curl -L "YOUR_LINK/sing-box" -o config.json
-  sing-box run -c config.json
-Your link is shown above, or send /start to get it.`},
+// platforms drives the picker layout: order, key, and button label. The label
+// (emoji + device name) is language-neutral; the step text lives in the catalog.
+var platforms = []struct{ key, label string }{
+	{"ios", "🍎 iOS"},
+	{"android", "🤖 Android"},
+	{"windows", "🪟 Windows"},
+	{"macos", "💻 macOS"},
+	{"linux", "🐧 Linux"},
 }
 
 // setupBtn only registers the callback endpoint; every picker button shares its
@@ -91,32 +42,29 @@ func setupMenu() *tele.ReplyMarkup {
 
 // onSetup shows the platform picker on demand.
 func (a *app) onSetup(c tele.Context) error {
-	return c.Send("Choose your device to see setup steps:", setupMenu())
+	return c.Send(tr(a.langOf(c)).setupChoose, setupMenu())
 }
 
-// stepsFor returns the setup instructions for a platform key.
-func stepsFor(key string) (string, bool) {
-	for _, platform := range platforms {
-		if platform.key == key {
-			return platform.steps, true
-		}
-	}
-	return "", false
+// stepsFor returns the setup instructions for a platform key in a language.
+func stepsFor(l lang, key string) (string, bool) {
+	steps, ok := tr(l).steps[key]
+	return steps, ok
 }
 
 // onSetupPick answers a tapped platform button with that platform's instructions,
 // prefixed with the user's own link when their chat is already bound.
 func (a *app) onSetupPick(c tele.Context) error {
-	steps, ok := stepsFor(c.Data())
+	m := tr(a.langOf(c))
+	steps, ok := stepsFor(a.langOf(c), c.Data())
 	if !ok {
-		return c.Respond(&tele.CallbackResponse{Text: "Unknown platform"})
+		return c.Respond(&tele.CallbackResponse{Text: m.unknownPlatform})
 	}
 	if err := c.Respond(); err != nil {
 		return err
 	}
-	steps = steps + "\n\n" + multiServerNote
+	steps = steps + "\n\n" + m.multiServerNote
 	if link, ok := a.subURLForChat(c.Chat().ID); ok {
-		steps = "Your subscription link:\n" + link + "\n\n" + steps
+		steps = fmt.Sprintf(m.subLinkPrefix, link) + steps
 	}
 	return c.Send(steps)
 }

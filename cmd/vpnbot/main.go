@@ -78,22 +78,33 @@ func run() error {
 	}
 	bot.Handle("/start", application.onStart)
 	bot.Handle("/setup", application.onSetup)
+	bot.Handle("/lang", application.onLang)
 	bot.Handle("/help", application.onHelp)
 	bot.Handle("/add", application.onAdd)
 	bot.Handle("/list", application.onList)
 	bot.Handle("/revoke", application.onRevoke)
 	bot.Handle(&setupBtn, application.onSetupPick)
+	bot.Handle(&langBtn, application.onLangPick)
 	bot.Handle(&addLocBtn, application.onAddToggle)
 	bot.Handle(&addDoneBtn, application.onAddDone)
 
-	// Advertise the user-facing commands in Telegram's "/" menu; admin commands
-	// stay unlisted (they answer "Not authorised." for everyone else).
-	if err := bot.SetCommands([]tele.Command{
-		{Text: "start", Description: "Claim or re-show your subscription"},
-		{Text: "setup", Description: "How to connect on your device"},
-		{Text: "help", Description: "Show available commands"},
-	}); err != nil {
+	// Advertise the user-facing commands in Telegram's "/" menu, in English by
+	// default and Russian for ru users; admin commands stay unlisted (they answer
+	// "Not authorised." for everyone else).
+	commandsFor := func(l lang) []tele.Command {
+		m := tr(l)
+		return []tele.Command{
+			{Text: "start", Description: m.cmdStart},
+			{Text: "setup", Description: m.cmdSetup},
+			{Text: "lang", Description: m.cmdLang},
+			{Text: "help", Description: m.cmdHelp},
+		}
+	}
+	if err := bot.SetCommands(commandsFor(langEN)); err != nil {
 		log.Printf("set commands: %v", err)
+	}
+	if err := bot.SetCommands(commandsFor(langRU), "ru"); err != nil {
+		log.Printf("set ru commands: %v", err)
 	}
 
 	log.Printf("vpnbot @%s ready; %d admin(s); ledger %s", bot.Me.Username, len(admins), ledgerPath)
