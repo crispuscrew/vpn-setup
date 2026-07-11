@@ -10,6 +10,11 @@ import (
 
 const setupUnique = "setup"
 
+// multiServerNote is appended to every platform's steps: the subscription carries
+// all of our nodes, and clients group them so the fastest is used automatically.
+const multiServerNote = `ℹ️ Using several servers
+We run more than one server, and they are all in your subscription. In your app pick "Auto" / "Best Latency" (a group, not a single server) to always use the fastest one. It switches over on its own if a server goes down. You can still pick a specific server by name.`
+
 // platforms drives the picker layout (order + labels) and holds the per-platform
 // setup steps. Every client below imports a standard subscription link.
 var platforms = []struct{ key, label, steps string }{
@@ -109,6 +114,7 @@ func (a *app) onSetupPick(c tele.Context) error {
 	if err := c.Respond(); err != nil {
 		return err
 	}
+	steps = steps + "\n\n" + multiServerNote
 	if link, ok := a.subURLForChat(c.Chat().ID); ok {
 		steps = "Your subscription link:\n" + link + "\n\n" + steps
 	}
