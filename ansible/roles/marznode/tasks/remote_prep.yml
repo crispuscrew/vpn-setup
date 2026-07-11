@@ -1,11 +1,20 @@
 # Runs on a remote node before marznode starts: open the gRPC port to the panel
 # only, and install the panel's client certificate so marznode can authenticate it.
-- name: Allow only the panel to reach the node's gRPC port
+- name: Allow only the panel to reach the node's gRPC port (firewalld / RedHat)
   ansible.posix.firewalld:
     rich_rule: 'rule family="ipv4" source address="{{ hostvars[groups["panel"][0]].ansible_host }}" port port="{{ marznode_port }}" protocol="tcp" accept'
     permanent: true
     immediate: true
     state: enabled
+  when: ansible_os_family == 'RedHat'
+
+- name: Allow only the panel to reach the node's gRPC port (ufw / Debian)
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ hostvars[groups['panel'][0]].ansible_host }}"
+    to_port: "{{ marznode_port }}"
+    proto: tcp
+  when: ansible_os_family == 'Debian'
 
 - name: Authenticate to the panel (to fetch the node certificate)
   ansible.builtin.uri:

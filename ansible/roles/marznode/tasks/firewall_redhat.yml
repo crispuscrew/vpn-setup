@@ -1,0 +1,6 @@
+# RedHat/AlmaLinux ship firewalld; open the Reality port in it.
+- name: Open the Reality port in firewalld
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ reality_port }}/tcp"
+  register: _fw_reality
+  changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
+  notify: reload firewalld

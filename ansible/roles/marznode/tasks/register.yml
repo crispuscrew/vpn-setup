@@ -6,10 +6,13 @@
     _panel_host: "{{ groups['panel'][0] }}"
     _node_address: "{{ '127.0.0.1' if node_mode == 'local' else ansible_host }}"
     _node_backend: "{{ 'grpcio' if node_mode == 'local' else 'grpclib' }}"
-    _node_name: "{{ node_name | default('local' if node_mode == 'local' else inventory_hostname) }}"
-    # User-facing server name shown in clients. Distinct per node so the several
-    # servers a subscription spans are told apart in the auto-select list.
-    _node_label: "{{ node_label | default(inventory_hostname) }}"
+    # Panel node name. Per-location services select nodes by this, so set `location`
+    # per host (e.g. "Estonia") to name the node after where it runs.
+    _node_name: "{{ node_name | default(location | default('local' if node_mode == 'local' else inventory_hostname)) }}"
+    # User-facing server name shown in clients (defaults to the location; set
+    # node_label for a prettier value like "🇪🇪 Estonia"). Distinct per node so the
+    # several servers a subscription spans are told apart in the auto-select list.
+    _node_label: "{{ node_label | default(location | default(inventory_hostname)) }}"
 
 - name: Authenticate to the panel
   ansible.builtin.uri:
@@ -111,7 +114,7 @@
   vars:
     # {USERNAME}/{PROTOCOL} are Marzneshin template vars rendered per user at
     # subscription time; only {{ _node_label }} is filled in here.
-    _host_remark: "🚀 {{ _node_label }} ({USERNAME}) [{PROTOCOL}]"
+    _host_remark: "{{ _node_label }} ({USERNAME}) [{PROTOCOL}]"
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts/{{ item.id }}"
     method: PUT

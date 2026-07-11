@@ -70,11 +70,9 @@
     dest: "{{ node_compose_dir }}/docker-compose.yml"
     mode: "0644"
 
-- name: Open the Reality port in firewalld
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ reality_port }}/tcp"
-  register: _fw_reality
-  changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
-  notify: reload firewalld
+- name: Open the Reality port in the host firewall
+  ansible.builtin.include_tasks:
+    file: "firewall_{{ 'debian' if ansible_os_family == 'Debian' else 'redhat' }}.yml"
 
 # ── Remote nodes need the gRPC port opened and the panel cert in place before
 #    marznode starts (it exits if the client cert is missing) ──────────────────
