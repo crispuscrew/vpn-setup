@@ -13,6 +13,8 @@
     - marznode
     - role: reverse_proxy
       when: panel_domain | default('') | length > 0
+    - role: amneziawg
+      when: awg_enabled | default(false) | bool
 
 - name: Node hosts - a marznode connected to the panel over TLS
   hosts: nodes
@@ -24,3 +26,5 @@
   roles:
     - common
     - marznode
+    - role: amneziawg
+      when: awg_enabled | default(false) | bool

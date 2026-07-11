@@ -1,0 +1,19 @@
+# Managed by Ansible (vpn-setup). AmneziaWG userspace server, pinned. Least
+# privilege: NET_ADMIN + /dev/net/tun only (no --privileged, no kernel module).
+services:
+  amneziawg:
+    image: {{ awg_image }}
+    container_name: {{ awg_container }}
+    restart: always
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    ports:
+      - "{{ awg_port }}:{{ awg_port }}/udp"
+    volumes:
+      - {{ awg_config_dir }}:/opt/amnezia/awg
+      - {{ awg_compose_dir }}/start.sh:/opt/amnezia/start.sh:ro
+    entrypoint: ["/bin/sh", "/opt/amnezia/start.sh"]

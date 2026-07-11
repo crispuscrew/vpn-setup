@@ -1,0 +1,20 @@
+# Build the AmneziaWG server image from Amnezia's own Dockerfile, pinned to the
+# client release tag. The Dockerfile is self-contained (FROM amneziavpn/amneziawg-go
+# plus amneziawg-tools), matching the upstream server build.
+- name: Check whether the AWG image already exists
+  ansible.builtin.command: "docker image inspect {{ awg_image }}"
+  register: _awg_image
+  failed_when: false
+  changed_when: false
+
+- name: Download the Amnezia AWG server Dockerfile
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/amnezia-vpn/amnezia-client/{{ awg_image_tag }}/client/server_scripts/awg/Dockerfile"
+    dest: "{{ awg_build_dir }}/Dockerfile"
+    mode: "0644"
+  when: _awg_image.rc != 0
+
+- name: Build the AWG server image
+  ansible.builtin.command:
+    cmd: "docker build -t {{ awg_image }} -f {{ awg_build_dir }}/Dockerfile {{ awg_build_dir }}"
+  when: _awg_image.rc != 0

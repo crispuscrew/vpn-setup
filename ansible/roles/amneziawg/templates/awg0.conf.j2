@@ -1,0 +1,26 @@
+[Interface]
+PrivateKey = {{ server_privkey }}
+Address = {{ awg_server_ip }}/{{ awg_subnet_cidr }}
+ListenPort = {{ awg_port }}
+Jc = {{ awg_jc }}
+Jmin = {{ awg_jmin }}
+Jmax = {{ awg_jmax }}
+S1 = {{ awg_s1 }}
+S2 = {{ awg_s2 }}
+{% if awg_protocol == "2" %}
+S3 = {{ awg_s3 }}
+S4 = {{ awg_s4 }}
+{% endif %}
+H1 = {{ awg_h1 }}
+H2 = {{ awg_h2 }}
+H3 = {{ awg_h3 }}
+H4 = {{ awg_h4 }}
+
+{% for client in awg_clients | default([]) %}
+[Peer]
+# {{ client.name }}
+PublicKey = {{ client.public_key }}
+PresharedKey = {{ server_psk }}
+AllowedIPs = {{ client.ip }}/32
+
+{% endfor %}

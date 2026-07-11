@@ -1,0 +1,39 @@
+# AmneziaWG (AWG) server: an obfuscated-WireGuard endpoint per node, run in
+# userspace (amneziawg-go) beside marznode. Delivered out of band (not via the
+# Marzneshin subscription, which cannot carry AWG). Peers are added later by the
+# bot; this role stands up the server and its awg0 interface.
+
+# Amnezia client release - the server image Dockerfile is pulled from this tag.
+# Pinned in versions.yml (amneziawg_release); the fallback keeps the role usable
+# on its own.
+awg_image_tag: "{{ amneziawg_release | default('4.8.14.1') }}"
+awg_image: "vpn-setup/amneziawg:{{ awg_image_tag }}"
+awg_container: amneziawg
+awg_compose_dir: /opt/vpn-setup/amneziawg
+awg_build_dir: /opt/vpn-setup/amneziawg/build
+awg_config_dir: /var/lib/amneziawg
+
+# Network
+awg_port: 51820             # AWG UDP listen port (free on every node)
+awg_server_ip: "10.8.0.1"
+awg_subnet: "10.8.0"
+awg_subnet_cidr: "24"
+awg_dns: "1.1.1.1, 1.0.0.1"
+
+# AWG protocol: "2" = full AWG 2.0 (S3/S4); "1.5" = compat without S3/S4.
+awg_protocol: "2"
+
+# Obfuscation. Effective values come from _awg_obfuscation (a per-node profile
+# in {{ awg_config_dir }}/obfuscation-params.yml); inventory overrides win. The
+# numbers below are only a last-resort fallback.
+awg_jc:   "{{ (_awg_obfuscation | default({})).awg_jc   | default(5)    | int }}"
+awg_jmin: "{{ (_awg_obfuscation | default({})).awg_jmin | default(100)  | int }}"
+awg_jmax: "{{ (_awg_obfuscation | default({})).awg_jmax | default(1000) | int }}"
+awg_s1:   "{{ (_awg_obfuscation | default({})).awg_s1   | default(15)   | int }}"
+awg_s2:   "{{ (_awg_obfuscation | default({})).awg_s2   | default(18)   | int }}"
+awg_s3:   "{{ (_awg_obfuscation | default({})).awg_s3   | default(20)   | int }}"
+awg_s4:   "{{ (_awg_obfuscation | default({})).awg_s4   | default(23)   | int }}"
+awg_h1:   "{{ (_awg_obfuscation | default({})).awg_h1   | default(1300352048) | int }}"
+awg_h2:   "{{ (_awg_obfuscation | default({})).awg_h2   | default(941078096)  | int }}"
+awg_h3:   "{{ (_awg_obfuscation | default({})).awg_h3   | default(1578745749) | int }}"
+awg_h4:   "{{ (_awg_obfuscation | default({})).awg_h4   | default(657723762)  | int }}"

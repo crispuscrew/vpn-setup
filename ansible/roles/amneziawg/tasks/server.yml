@@ -1,0 +1,109 @@
+# Server keys: generated once inside the image, persisted on the host, read every
+# run (needed to render awg0.conf and, later, client configs).
+- name: Check for server keys
+  ansible.builtin.stat:
+    path: "{{ awg_config_dir }}/{{ item }}"
+  loop:
+    - server_private.key
+    - server_public.key
+    - server_psk.key
+  register: _awg_key_stats
+
+- name: Set keys-complete fact
+  ansible.builtin.set_fact:
+    _awg_keys_complete: "{{ _awg_key_stats.results | map(attribute='stat.exists') | list | min | bool }}"
+
+- name: Generate server keys (private + public + PSK)
+  ansible.builtin.command: >
+    docker run --rm --entrypoint sh {{ awg_image }} -c
+    'priv=$(awg genkey); pub=$(printf "%s\n" "$priv" | awg pubkey); psk=$(awg genpsk);
+     printf "%s\n%s\n%s\n" "$priv" "$pub" "$psk"'
+  register: _awg_keys
+  no_log: true
+  when: not _awg_keys_complete
+
+- name: Save server keys
+  ansible.builtin.copy:
+    content: "{{ _awg_keys.stdout_lines[item.idx] }}\n"
+    dest: "{{ awg_config_dir }}/{{ item.name }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { idx: 0, name: server_private.key, mode: "0600" }
+    - { idx: 1, name: server_public.key, mode: "0644" }
+    - { idx: 2, name: server_psk.key, mode: "0600" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+  when: not _awg_keys_complete
+
+- name: Read server keys
+  ansible.builtin.slurp:
+    src: "{{ awg_config_dir }}/{{ item }}"
+  loop:
+    - server_private.key
+    - server_public.key
+    - server_psk.key
+  register: _awg_key_raw
+  no_log: true
+
+- name: Set server key facts
+  ansible.builtin.set_fact:
+    server_privkey: "{{ _awg_key_raw.results[0].content | b64decode | trim }}"
+    server_pubkey: "{{ _awg_key_raw.results[1].content | b64decode | trim }}"
+    server_psk: "{{ _awg_key_raw.results[2].content | b64decode | trim }}"
+  no_log: true
+
+# awg0.conf holds the [Interface] plus any peers the bot has added live. Render it
+# only when absent so a re-run never wipes bot-managed peers; the interface params
+# are stable (obfuscation is generated once).
+- name: Check for an existing awg0.conf
+  ansible.builtin.stat:
+    path: "{{ awg_config_dir }}/awg0.conf"
+  register: _awg0_stat
+
+- name: Render the initial awg0.conf (server interface, no peers yet)
+  ansible.builtin.template:
+    src: awg0.conf.j2
+    dest: "{{ awg_config_dir }}/awg0.conf"
+    mode: "0600"
+  when: not _awg0_stat.stat.exists
+  notify: restart amneziawg
+
+- name: Render start.sh
+  ansible.builtin.template:
+    src: start.sh.j2
+    dest: "{{ awg_compose_dir }}/start.sh"
+    mode: "0755"
+  notify: restart amneziawg
+
+- name: Render the compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ awg_compose_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start AmneziaWG
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ awg_compose_dir }}"
+  register: _awg_up
+  changed_when: >-
+    ('Started' in _awg_up.stderr) or ('Created' in _awg_up.stderr)
+    or ('Recreated' in _awg_up.stderr)
+
+- name: Apply any pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify awg0 is up inside the container
+  ansible.builtin.command: "docker exec {{ awg_container }} ip -o addr show awg0"
+  register: _awg0_addr
+  retries: 15
+  delay: 2
+  until: _awg0_addr.rc == 0 and (awg_server_ip in _awg0_addr.stdout)
+  changed_when: false
+
+- name: Report the AWG server
+  ansible.builtin.debug:
+    msg: >-
+      AmneziaWG up on {{ inventory_hostname }} ({{ ansible_host }}:{{ awg_port }}/udp),
+      awg0 at {{ awg_server_ip }}, protocol {{ awg_protocol }}

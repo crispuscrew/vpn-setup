@@ -1,0 +1,26 @@
+- name: Install prerequisites
+  ansible.builtin.package:
+    name: "{{ os_packages }}"
+    state: present
+
+- name: Enable IP forwarding (runtime)
+  ansible.builtin.command: sysctl -w net.ipv4.ip_forward=1
+  changed_when: false
+
+- name: Enable IP forwarding (persistent)
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^#?\s*net\.ipv4\.ip_forward'
+    line: 'net.ipv4.ip_forward=1'
+    create: true
+
+- name: Ensure directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ awg_config_dir }}"
+    - "{{ awg_config_dir }}/clients"
+    - "{{ awg_compose_dir }}"
+    - "{{ awg_build_dir }}"
