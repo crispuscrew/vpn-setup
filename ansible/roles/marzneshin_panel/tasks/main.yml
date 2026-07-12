@@ -56,3 +56,6 @@
     chdir: "{{ panel_compose_dir }}"
   register: _admin
   changed_when: "'imported successfully' in _admin.stdout"
+
+- name: Ensure Hiddify clients get the sing-box subscription format
+  ansible.builtin.include_tasks: subscription_rules.yml

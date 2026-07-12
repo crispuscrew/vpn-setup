@@ -1,0 +1,48 @@
+# Route every Hiddify client to the sing-box subscription format, not just the exact
+# UA "HiddifyNext". Marzneshin's default rules match only HiddifyNext, so a plain
+# "Hiddify/…" (or "hiddify-next") UA falls through to the base64 link feed - whose
+# legacy ss:// link Hiddify's parser rejects, failing the whole profile import. We
+# broaden that one rule; every other client's mapping is left exactly as shipped.
+- name: Authenticate to the panel (subscription rules)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/admins/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ panel_sudo_username }}"
+      password: "{{ panel_sudo_password }}"
+  register: _sub_tok
+  no_log: true
+
+- name: Read the subscription settings
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/system/settings/subscription"
+    headers:
+      Authorization: "Bearer {{ _sub_tok.json.access_token }}"
+  register: _sub_settings
+
+- name: Reset the rule accumulator
+  ansible.builtin.set_fact:
+    _patched_rules: []
+
+- name: Compute the patched rule set (broaden Hiddify in place, keep order)
+  ansible.builtin.set_fact:
+    _patched_rules: >-
+      {{ _patched_rules | default([]) +
+         [ (item | combine({'pattern': _new_pattern})) if item.pattern == _old_pattern else item ] }}
+  loop: "{{ _sub_settings.json.rules }}"
+  loop_control:
+    label: "{{ item.pattern }}"
+  vars:
+    _old_pattern: '^(SFA|SFI|SFM|SFT|[Kk]aring|[Hh]iddify[Nn]ext)'
+    _new_pattern: '^(SFA|SFI|SFM|SFT|[Kk]aring|[Hh]iddify)'
+
+- name: Apply the broadened Hiddify rule (only when it actually changed)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ panel_port }}/api/system/settings/subscription"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ _sub_tok.json.access_token }}"
+    body_format: json
+    body: "{{ _sub_settings.json | combine({'rules': _patched_rules}) }}"
+  when: _patched_rules != _sub_settings.json.rules
