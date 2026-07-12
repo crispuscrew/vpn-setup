@@ -150,6 +150,9 @@ func (a *app) stillGranted(ctx context.Context, client *panel.Client, username, 
 // provisionAWG reuses the user's stored peer for a location or mints one, ensures
 // it exists on the node (idempotent), and returns the rendered client config.
 func (a *app) provisionAWG(ctx context.Context, _ *panel.Client, username, location, host string) (string, error) {
+	// Serialise per user so a double-tap can't mint two peers for one location.
+	unlock := a.lockUser(username)
+	defer unlock()
 	peer, ok := a.ledger.AWGPeer(username, location)
 	if !ok {
 		kp, err := awg.GenerateKeypair()

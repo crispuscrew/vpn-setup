@@ -1,21 +1,24 @@
-# RedHat/AlmaLinux ship firewalld; open the Reality port in it.
+# RedHat/AlmaLinux ship firewalld; open the protocol ports in it. Note: firewall-cmd
+# prints "success" to stdout but the "ALREADY_ENABLED" warning to stderr, so the
+# idempotency check must look at stderr - checking stdout would report changed (and
+# reload firewalld) on every run.
 - name: Open the Reality port in firewalld
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ reality_port }}/tcp"
   register: _fw_reality
-  changed_when: "'ALREADY_ENABLED' not in _fw_reality.stdout"
+  changed_when: "'ALREADY_ENABLED' not in _fw_reality.stderr"
   notify: reload firewalld
 
 - name: Open the Hysteria2 port in firewalld (UDP)
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ hysteria2_port }}/udp"
   register: _fw_hy2
-  changed_when: "'ALREADY_ENABLED' not in _fw_hy2.stdout"
+  changed_when: "'ALREADY_ENABLED' not in _fw_hy2.stderr"
   notify: reload firewalld
   when: hysteria2_enabled | default(false) | bool
 
 - name: Open the TUIC port in firewalld (UDP)
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ tuic_port }}/udp"
   register: _fw_tuic
-  changed_when: "'ALREADY_ENABLED' not in _fw_tuic.stdout"
+  changed_when: "'ALREADY_ENABLED' not in _fw_tuic.stderr"
   notify: reload firewalld
   when: tuic_enabled | default(false) | bool
 
@@ -23,13 +26,13 @@
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ shadowsocks_port }}/{{ item }}"
   loop: [tcp, udp]
   register: _fw_ss
-  changed_when: "'ALREADY_ENABLED' not in _fw_ss.stdout"
+  changed_when: "'ALREADY_ENABLED' not in _fw_ss.stderr"
   notify: reload firewalld
   when: shadowsocks_enabled | default(false) | bool
 
 - name: Open the Trojan port in firewalld (TCP)
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ trojan_port }}/tcp"
   register: _fw_trojan
-  changed_when: "'ALREADY_ENABLED' not in _fw_trojan.stdout"
+  changed_when: "'ALREADY_ENABLED' not in _fw_trojan.stderr"
   notify: reload firewalld
   when: trojan_enabled | default(false) | bool

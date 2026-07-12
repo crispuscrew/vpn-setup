@@ -32,7 +32,9 @@ var (
 	// (fixed subcommands, sanitised names, base64 keys) fits it, so the remote
 	// command is a plain space-joined string that both a login shell and the
 	// forced-command wrapper's word-split parse identically - no quoting needed.
-	argSafe = regexp.MustCompile(`^[A-Za-z0-9_.:/=+@%-]+$`)
+	// The first character may not be '-', so a crafted argument can never be
+	// word-split into an option flag to awg-peer/awk/grep (internal '-' is fine).
+	argSafe = regexp.MustCompile(`^[A-Za-z0-9_.:/=+@%][A-Za-z0-9_.:/=+@%-]*$`)
 )
 
 // NodeAgent runs the node-side awg-peer script over SSH (pure Go, so it works in a

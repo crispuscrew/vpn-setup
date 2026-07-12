@@ -119,6 +119,10 @@ func (a *app) onAddToggle(c tele.Context) error {
 	if err != nil {
 		return c.Respond(&tele.CallbackResponse{Text: m.panelShort})
 	}
+	// Serialise per user so two quick taps can't both read the same base service
+	// set and clobber each other on the full-replace PUT.
+	unlock := a.lockUser(username)
+	defer unlock()
 	user, err := client.User(ctx, username)
 	if err != nil {
 		return c.Respond(&tele.CallbackResponse{Text: m.addNoUser})

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	tele "gopkg.in/telebot.v3"
@@ -81,6 +82,11 @@ func (a *app) onRevoke(c tele.Context) error {
 	}
 	username := strings.ToLower(args[0])
 
+	// Serialise against a concurrent provision for the same user so we don't leave a
+	// freshly-minted peer live after tearing the others down.
+	unlock := a.lockUser(username)
+	defer unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
 	client, err := panel.FromEnv(ctx)
@@ -92,6 +98,25 @@ func (a *app) onRevoke(c tele.Context) error {
 			return c.Send(fmt.Sprintf(m.revokeNoUser, username))
 		}
 		return c.Send(fmt.Sprintf(m.revokeFailed, err.Error()))
+	}
+	// Rotating the sub key only kills the standard link. AmneziaWG is delivered as a
+	// standalone .conf, so it must be torn down on the node too or a revoked user
+	// keeps a live tunnel. Fail loudly if a node can't be reached rather than falsely
+	// reporting the user revoked; the ledger entry stays so the admin can retry.
+	if a.awgConfigured() {
+		for _, peer := range a.ledger.AWGPeersFor(username) {
+			host, ok := a.awgNodes[peer.Location]
+			if !ok {
+				continue
+			}
+			if err := a.awgAgent.DelPeer(ctx, host, peer.PublicKey); err != nil {
+				log.Printf("revoke %s: del awg peer @%s: %v", username, peer.Location, err)
+				return c.Send(fmt.Sprintf(m.revokeFailed, err.Error()))
+			}
+			if _, err := a.ledger.DeleteAWGPeer(username, peer.Location); err != nil {
+				return err
+			}
+		}
 	}
 	if _, err := a.ledger.Remove(username); err != nil {
 		return err

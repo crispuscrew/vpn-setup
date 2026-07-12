@@ -90,7 +90,11 @@ func (l *Ledger) Add(username, token string) error {
 		}
 	}
 	l.data.Entries = append(l.data.Entries, Entry{Username: username, Token: token, Status: Pending})
-	return l.save()
+	if err := l.save(); err != nil {
+		l.data.Entries = l.data.Entries[:len(l.data.Entries)-1]
+		return err
+	}
+	return nil
 }
 
 // Claim binds chatID to the entry named by token and marks it delivered. The
@@ -105,9 +109,12 @@ func (l *Ledger) Claim(token string, chatID int64) (Entry, bool, error) {
 		}
 		first := l.data.Entries[i].Status == Pending
 		if first {
+			prevChat := l.data.Entries[i].ChatID
 			l.data.Entries[i].ChatID = chatID
 			l.data.Entries[i].Status = Delivered
 			if err := l.save(); err != nil {
+				l.data.Entries[i].Status = Pending
+				l.data.Entries[i].ChatID = prevChat
 				return Entry{}, false, err
 			}
 		}
@@ -131,8 +138,17 @@ func (l *Ledger) SetLang(chatID int64, code string) error {
 	if l.data.Langs == nil {
 		l.data.Langs = make(map[int64]string)
 	}
+	prev, had := l.data.Langs[chatID]
 	l.data.Langs[chatID] = code
-	return l.save()
+	if err := l.save(); err != nil {
+		if had {
+			l.data.Langs[chatID] = prev
+		} else {
+			delete(l.data.Langs, chatID)
+		}
+		return err
+	}
+	return nil
 }
 
 // ByUsername returns the entry tracked for a panel username, if any.
@@ -165,12 +181,21 @@ func (l *Ledger) SaveAWGPeer(peer AWGPeer) error {
 	defer l.mu.Unlock()
 	for i := range l.data.AWGPeers {
 		if l.data.AWGPeers[i].Username == peer.Username && l.data.AWGPeers[i].Location == peer.Location {
+			prev := l.data.AWGPeers[i]
 			l.data.AWGPeers[i] = peer
-			return l.save()
+			if err := l.save(); err != nil {
+				l.data.AWGPeers[i] = prev
+				return err
+			}
+			return nil
 		}
 	}
 	l.data.AWGPeers = append(l.data.AWGPeers, peer)
-	return l.save()
+	if err := l.save(); err != nil {
+		l.data.AWGPeers = l.data.AWGPeers[:len(l.data.AWGPeers)-1]
+		return err
+	}
+	return nil
 }
 
 // ByChat returns the entry a chat has already claimed, if any.
@@ -202,22 +227,87 @@ func (l *Ledger) Remove(username string) (bool, error) {
 		if entry.Username != username {
 			continue
 		}
+		removed := entry
 		l.data.Entries = append(l.data.Entries[:i], l.data.Entries[i+1:]...)
-		return true, l.save()
+		if err := l.save(); err != nil {
+			l.data.Entries = append(l.data.Entries, Entry{})
+			copy(l.data.Entries[i+1:], l.data.Entries[i:])
+			l.data.Entries[i] = removed
+			return false, err
+		}
+		return true, nil
 	}
 	return false, nil
 }
 
-// save writes the ledger atomically: a temp file in the same directory, then a
-// rename over the target so readers never observe a partial write.
+// AWGPeersFor returns every stored AmneziaWG peer for a user, across locations.
+func (l *Ledger) AWGPeersFor(username string) []AWGPeer {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []AWGPeer
+	for _, peer := range l.data.AWGPeers {
+		if peer.Username == username {
+			out = append(out, peer)
+		}
+	}
+	return out
+}
+
+// DeleteAWGPeer drops a user's stored peer for a location, returning whether one
+// was present. Used when access is revoked so the peer is not silently reused.
+func (l *Ledger) DeleteAWGPeer(username, location string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i, peer := range l.data.AWGPeers {
+		if peer.Username != username || peer.Location != location {
+			continue
+		}
+		removed := peer
+		l.data.AWGPeers = append(l.data.AWGPeers[:i], l.data.AWGPeers[i+1:]...)
+		if err := l.save(); err != nil {
+			l.data.AWGPeers = append(l.data.AWGPeers, AWGPeer{})
+			copy(l.data.AWGPeers[i+1:], l.data.AWGPeers[i:])
+			l.data.AWGPeers[i] = removed
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// save writes the ledger atomically and durably: a temp file in the same directory
+// is written and fsync'd, renamed over the target so readers never observe a partial
+// write, then the parent directory is fsync'd so the rename survives a power loss.
+// Callers mutate l.data first and roll the change back if this returns an error, so a
+// failed write never leaves memory ahead of disk.
 func (l *Ledger) save() error {
 	raw, err := json.MarshalIndent(l.data, "", "  ")
 	if err != nil {
 		return err
 	}
 	tmp := l.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+	file, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, l.path)
+	if _, err := file.Write(raw); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, l.path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(l.path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
