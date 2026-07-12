@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -32,10 +33,24 @@ type app struct {
 	// AmneziaWG delivery is not configured.
 	awgNodes map[string]string
 	awgAgent *awg.NodeAgent
+	// userLocks serialises a single user's read-modify-write operations (panel
+	// service toggles, AWG provisioning, revoke) so concurrent Telegram callbacks
+	// for that user can't race; different users still proceed in parallel.
+	userLocks sync.Map
 }
 
 func (a *app) isAdmin(c tele.Context) bool {
 	return c.Sender() != nil && a.admins[c.Sender().ID]
+}
+
+// lockUser locks the per-user mutex and returns its unlock func. telebot runs each
+// update handler in its own goroutine, so a check-then-write across panel/ledger
+// (e.g. mint-or-reuse an AWG peer, toggle a service) would otherwise interleave.
+func (a *app) lockUser(username string) func() {
+	value, _ := a.userLocks.LoadOrStore(username, &sync.Mutex{})
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	return mutex.Unlock
 }
 
 // newToken returns a random claim token safe to put in a t.me deep link.
