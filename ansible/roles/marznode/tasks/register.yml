@@ -26,9 +26,11 @@
   delegate_to: "{{ _panel_host }}"
   no_log: true
 
+# size=100 keeps the list on a single page (the panel paginates at 50 by default);
+# ample headroom for any realistic node/host count without an Ansible paging loop.
 - name: List existing nodes
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes?size=100"
     headers:
       Authorization: "Bearer {{ _tok.json.access_token }}"
   register: _nodes
@@ -53,7 +55,7 @@
 
 - name: Re-list nodes and pick this one
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/nodes"
+    url: "http://127.0.0.1:{{ panel_port }}/api/nodes?size=100"
     headers:
       Authorization: "Bearer {{ _tok.json.access_token }}"
   register: _nodes2
@@ -104,7 +106,7 @@
 # public address and give it this node's label so the servers are told apart.
 - name: List inbound hosts
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts"
+    url: "http://127.0.0.1:{{ panel_port }}/api/inbounds/hosts?size=100"
     headers:
       Authorization: "Bearer {{ _tok.json.access_token }}"
   register: _hosts

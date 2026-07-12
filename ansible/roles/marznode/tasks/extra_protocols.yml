@@ -30,6 +30,12 @@
     creates: "{{ marznode_dir }}/hysteria2_obfs.txt"
   when: hysteria2_enabled | default(false) | bool
 
+- name: Secure the obfs password file
+  ansible.builtin.file:
+    path: "{{ marznode_dir }}/hysteria2_obfs.txt"
+    mode: "0600"
+  when: hysteria2_enabled | default(false) | bool
+
 - name: Load the Hysteria2 obfs password
   ansible.builtin.slurp:
     src: "{{ marznode_dir }}/hysteria2_obfs.txt"
