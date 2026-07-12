@@ -118,7 +118,11 @@ cmd_del_peer() {
     }
   ' "$CONF" > "$tmp"
   mv "$tmp" "$CONF"
-  docker exec "$CONTAINER" awg set awg0 peer "$pub" remove || true
+  # No `|| true`: `awg set ... peer <key> remove` already exits 0 for an absent peer,
+  # so the only thing it would mask is a real failure (docker/awg error) that leaves
+  # the peer live after we dropped it from the conf. Let set -e surface that so the
+  # bot reports the revoke as failed instead of falsely succeeding.
+  docker exec "$CONTAINER" awg set awg0 peer "$pub" remove
   echo '{"ok":true}'
 }
 

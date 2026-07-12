@@ -40,9 +40,22 @@ func TestRemoteCommandJoinsSafeArgs(t *testing.T) {
 }
 
 func TestRemoteCommandRejectsUnsafeArgs(t *testing.T) {
-	for _, bad := range []string{"a b", "x;rm -rf /", "it's", "$(whoami)", "a`b`", "a|b"} {
+	for _, bad := range []string{"a b", "x;rm -rf /", "it's", "$(whoami)", "a`b`", "a|b", ""} {
 		if _, err := remoteCommand("/usr/local/sbin/awg-peer", []string{"add-peer", bad, "key"}); err == nil {
 			t.Errorf("remoteCommand should reject %q", bad)
 		}
+	}
+}
+
+// A leading '-' would word-split into an option flag to awg-peer/awk/grep; reject it
+// while still allowing '-' inside an argument (del-peer, alice-USA).
+func TestRemoteCommandRejectsLeadingDash(t *testing.T) {
+	for _, bad := range []string{"-rf", "--help", "-"} {
+		if _, err := remoteCommand("/usr/local/sbin/awg-peer", []string{bad}); err == nil {
+			t.Errorf("remoteCommand should reject leading-dash arg %q", bad)
+		}
+	}
+	if _, err := remoteCommand("/usr/local/sbin/awg-peer", []string{"del-peer", "alice-USA"}); err != nil {
+		t.Errorf("remoteCommand rejected a valid internal-dash arg: %v", err)
 	}
 }
