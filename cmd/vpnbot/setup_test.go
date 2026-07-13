@@ -3,6 +3,8 @@ package main
 import (
 	"reflect"
 	"testing"
+
+	tele "gopkg.in/telebot.v3"
 )
 
 func TestStepsForKnownPlatforms(t *testing.T) {
@@ -35,15 +37,21 @@ func TestPlatformKeysUnique(t *testing.T) {
 	}
 }
 
-// setupMenu must expose exactly one button per platform, so no device is
-// unreachable from the picker.
-func TestSetupMenuCoversEveryPlatform(t *testing.T) {
-	buttons := 0
-	for _, row := range setupMenu().InlineKeyboard {
-		buttons += len(row)
+// connectMenu must expose exactly one button per platform, so no device is
+// unreachable from the picker, plus one AmneziaWG button when AWG is available.
+func TestConnectMenuCoversEveryPlatform(t *testing.T) {
+	countButtons := func(markup *tele.ReplyMarkup) int {
+		buttons := 0
+		for _, row := range markup.InlineKeyboard {
+			buttons += len(row)
+		}
+		return buttons
 	}
-	if buttons != len(platforms) {
-		t.Errorf("setupMenu has %d buttons, want %d", buttons, len(platforms))
+	if got := countButtons(connectMenu(false)); got != len(platforms) {
+		t.Errorf("connectMenu(false) has %d buttons, want %d", got, len(platforms))
+	}
+	if got := countButtons(connectMenu(true)); got != len(platforms)+1 {
+		t.Errorf("connectMenu(true) has %d buttons, want %d", got, len(platforms)+1)
 	}
 }
 

@@ -105,6 +105,7 @@ func run() error {
 	bot.Handle(&addLocBtn, application.onAddToggle)
 	bot.Handle(&addDoneBtn, application.onAddDone)
 	bot.Handle(&awgLocBtn, application.onAWGPick)
+	bot.Handle(&awgStartBtn, application.onAWGMenu)
 
 	// Advertise the user-facing commands in Telegram's "/" menu, in English by
 	// default and Russian for ru users; admin commands stay unlisted (they answer

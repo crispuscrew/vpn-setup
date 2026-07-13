@@ -67,6 +67,7 @@ type msg struct {
 	revokeOK         string // takes username
 	accountNotFound  string
 	deliverCaption   string // takes subscription URL
+	deliverAwgNote   string // appended to delivery when AmneziaWG is available
 	setupChoose      string
 	unknownPlatform  string
 	subLinkPrefix    string // takes link

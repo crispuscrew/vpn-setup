@@ -22,6 +22,12 @@ const awgLocUnique = "awgloc"
 // unique and routes to onAWGPick.
 var awgLocBtn = tele.Btn{Unique: awgLocUnique}
 
+const awgStartUnique = "awgstart"
+
+// awgStartBtn is the AmneziaWG button on the delivery/setup menu; tapping it opens
+// the same location picker as the /awg command for the account bound to this chat.
+var awgStartBtn = tele.Btn{Unique: awgStartUnique}
+
 // awgConfigured reports whether any AmneziaWG nodes are wired up for the bot.
 func (a *app) awgConfigured() bool { return len(a.awgNodes) > 0 && a.awgAgent != nil }
 
@@ -51,6 +57,13 @@ func (a *app) onAWG(c tele.Context) error {
 		return c.Send(m.awgNoLocations)
 	}
 	return c.Send(m.awgChoose, awgLocationMarkup(username, locations))
+}
+
+// onAWGMenu opens the AmneziaWG location picker from a tapped menu button, acting
+// for the account bound to this chat - the button-driven twin of the /awg command.
+func (a *app) onAWGMenu(c tele.Context) error {
+	_ = c.Respond()
+	return a.onAWG(c)
 }
 
 // awgTarget resolves whose config to act on: an admin's explicit username argument,
