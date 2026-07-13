@@ -131,8 +131,13 @@ re-apply:
     nodes: ["Serbia"]     # every inbound on the node named Serbia
 ```
 
-The `all` service (`inbounds: ["*"]`) always spans every node; per-location services
-scope a user to one node. The bot's `/add` picker grants any subset of these.
+The `all` service is the auto-select pool and lists the **exit** nodes explicitly
+(`nodes: ["Estonia", "Serbia", "USA"]`). Russia is left out on purpose: it sits inside
+the censored network, so a direct Russia exit reaches nothing useful and a client's
+"Best Latency" would wrongly pick it (lowest ping from inside Russia). It stays a
+grantable per-location service and is reserved as a future multi-hop entry relay. Add
+new exit nodes to `all` explicitly so none joins the pool by accident. Per-location
+services scope a user to one node; the bot's `/add` picker grants any subset of these.
 
 ### Protocols
 

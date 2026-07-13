@@ -9,9 +9,13 @@
 # leaves anything else on the panel untouched (no pruning).
 
 services:
-  # One service exposing every inbound on every node.
+  # The auto-select pool: every EXIT node. Russia is deliberately excluded - it sits
+  # inside the censored network, so a direct Russia exit reaches nothing useful, and a
+  # client's "Best Latency" would wrongly pick it (lowest ping from inside Russia). It
+  # stays a grantable per-location service below, reserved as a future multi-hop entry
+  # relay. List exit nodes explicitly so none joins the auto-select pool by accident.
   - name: all
-    inbounds: ["*"]
+    nodes: ["Estonia", "Serbia", "USA"]
   # Per-location services grant access to a single node, selected by its panel
   # node name. The bot's /add picker grants any subset of these to a user.
   - name: Estonia
