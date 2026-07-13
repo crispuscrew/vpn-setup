@@ -36,6 +36,37 @@ func TestParseAWGNodesMalformed(t *testing.T) {
 	}
 }
 
+func TestResolveAWGTarget(t *testing.T) {
+	const bound = "crispuscrew"
+	cases := []struct {
+		name     string
+		args     []string
+		isAdmin  bool
+		hasBound bool
+		want     string
+		wantOK   bool
+	}{
+		// A tapped button is a callback: Args() is [""]. It must resolve to the
+		// caller's own account, not an empty username (the reported bug).
+		{"admin taps button", []string{""}, true, true, bound, true},
+		{"non-admin taps button", []string{""}, false, true, bound, true},
+		{"admin bare command", nil, true, true, bound, true},
+		{"admin targets a user", []string{"alice"}, true, true, "alice", true},
+		{"admin arg is lowercased", []string{"Alice"}, true, true, "alice", true},
+		{"non-admin arg ignored, uses bound", []string{"alice"}, false, true, bound, true},
+		{"button but no bound account", []string{""}, true, false, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := resolveAWGTarget(tc.args, tc.isAdmin, bound, tc.hasBound)
+			if got != tc.want || ok != tc.wantOK {
+				t.Errorf("resolveAWGTarget(%q, admin=%v, bound=%v) = (%q, %v), want (%q, %v)",
+					tc.args, tc.isAdmin, tc.hasBound, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}
+
 func TestParseUserLocation(t *testing.T) {
 	user, loc, ok := parseUserLocation("alice|Estonia")
 	if !ok || user != "alice" || loc != "Estonia" {

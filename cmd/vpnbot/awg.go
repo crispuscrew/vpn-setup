@@ -69,11 +69,21 @@ func (a *app) onAWGMenu(c tele.Context) error {
 // awgTarget resolves whose config to act on: an admin's explicit username argument,
 // else the account bound to this chat.
 func (a *app) awgTarget(c tele.Context) (string, bool) {
-	if args := c.Args(); len(args) == 1 && a.isAdmin(c) {
+	entry, hasBound := a.ledger.ByChat(c.Chat().ID)
+	return resolveAWGTarget(c.Args(), a.isAdmin(c), entry.Username, hasBound)
+}
+
+// resolveAWGTarget picks whose config to act on from the resolved inputs. An admin's
+// explicit, non-empty username argument wins; otherwise the caller's own bound account.
+// A tapped menu button arrives as a callback whose Args() is [""] (one empty element),
+// so the empty-arg check keeps a button tap from resolving to an empty username instead
+// of falling through to the caller's account.
+func resolveAWGTarget(args []string, isAdmin bool, boundUser string, hasBound bool) (string, bool) {
+	if len(args) == 1 && args[0] != "" && isAdmin {
 		return strings.ToLower(args[0]), true
 	}
-	if entry, ok := a.ledger.ByChat(c.Chat().ID); ok {
-		return entry.Username, true
+	if hasBound {
+		return boundUser, true
 	}
 	return "", false
 }
