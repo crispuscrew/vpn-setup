@@ -29,6 +29,7 @@ var enMsg = msg{
 	accountNotFound: "Your account was not found. Please contact your administrator.",
 	deliverCaption: "Your VPN subscription. Import this link into your client, or scan the QR:\n\n" +
 		"%s\n\nNew here? Tap your device below for setup steps.",
+	deliverAwgNote:  "\n\n🔐 Want WireGuard as well? Tap AmneziaWG below for a separate, DPI-resistant config.",
 	setupChoose:     "Choose your device to see setup steps:",
 	unknownPlatform: "Unknown platform",
 	subLinkPrefix:   "Your subscription link:\n%s\n\n",
@@ -54,8 +55,8 @@ var enMsg = msg{
 	awgChoose:        "Choose a location for your AmneziaWG config:",
 	awgProvisioning:  "Preparing your config...",
 	awgFailed:        "Could not prepare the config right now - please try again later.",
-	awgCaption: "AmneziaWG config for %s. Open the AmneziaVPN app, tap +, and import this " +
-		"file (or scan the QR below).",
+	awgCaption: "AmneziaWG config for %s. Get the AmneziaVPN app (amnezia.org or your app " +
+		"store), then tap + and import this file - or scan the QR below.",
 	awgQRCaption: "Scan this in the AmneziaVPN app to import the config.",
 	cmdStart:     "Claim or re-show your subscription",
 	cmdSetup:     "How to connect on your device",

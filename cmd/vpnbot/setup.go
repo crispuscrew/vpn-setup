@@ -25,10 +25,13 @@ var platforms = []struct{ key, label string }{
 // "setup" unique, so they all route to onSetupPick.
 var setupBtn = tele.Btn{Unique: setupUnique}
 
-// setupMenu builds the inline platform picker, two buttons per row.
-func setupMenu() *tele.ReplyMarkup {
+// connectMenu builds the inline menu shown after delivery and by /setup: one button
+// per platform for the subscription clients, plus an AmneziaWG button when AWG is
+// available. AmneziaWG is a separate protocol delivered as its own config, so it
+// rides alongside the picker rather than inside the subscription.
+func connectMenu(awg bool) *tele.ReplyMarkup {
 	markup := &tele.ReplyMarkup{}
-	var rows []tele.Row
+	rows := make([]tele.Row, 0, len(platforms)/2+2)
 	for i := 0; i < len(platforms); i += 2 {
 		row := []tele.Btn{markup.Data(platforms[i].label, setupUnique, platforms[i].key)}
 		if i+1 < len(platforms) {
@@ -36,13 +39,16 @@ func setupMenu() *tele.ReplyMarkup {
 		}
 		rows = append(rows, markup.Row(row...))
 	}
+	if awg {
+		rows = append(rows, markup.Row(markup.Data("🔐 AmneziaWG", awgStartUnique)))
+	}
 	markup.Inline(rows...)
 	return markup
 }
 
-// onSetup shows the platform picker on demand.
+// onSetup shows the connect menu on demand.
 func (a *app) onSetup(c tele.Context) error {
-	return c.Send(tr(a.langOf(c)).setupChoose, setupMenu())
+	return c.Send(tr(a.langOf(c)).setupChoose, connectMenu(a.awgConfigured()))
 }
 
 // stepsFor returns the setup instructions for a platform key in a language.

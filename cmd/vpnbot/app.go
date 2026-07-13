@@ -84,5 +84,8 @@ func (a *app) deliver(c tele.Context, username string) error {
 		return err
 	}
 	caption := fmt.Sprintf(m.deliverCaption, user.SubscriptionURL)
-	return c.Send(&tele.Photo{File: tele.FromReader(bytes.NewReader(png)), Caption: caption}, setupMenu())
+	if a.awgConfigured() {
+		caption += m.deliverAwgNote
+	}
+	return c.Send(&tele.Photo{File: tele.FromReader(bytes.NewReader(png)), Caption: caption}, connectMenu(a.awgConfigured()))
 }
