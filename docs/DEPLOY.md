@@ -136,15 +136,20 @@ scope a user to one node. The bot's `/add` picker grants any subset of these.
 
 ### Protocols
 
-Each node exposes five protocols, all folded into the one subscription:
+Each node exposes four protocols by default, all folded into the one subscription:
 
 - **VLESS+Reality** (TCP) - needs no domain or cert.
 - **Hysteria2** (UDP, port 8443) - `hysteria2_enabled`.
 - **TUIC** (UDP, port 8444, via sing-box) - `tuic_enabled`.
 - **Trojan** (TCP, port 8445, via xray) - `trojan_enabled`.
-- **Shadowsocks** (TCP+UDP, port 8388, via xray) - `shadowsocks_enabled`. Plaintext
-  AEAD (its own encryption), so it needs no TLS or domain; the cipher is chosen per
-  user by the panel.
+
+**Shadowsocks** (TCP+UDP, port 8388, via xray) ships behind `shadowsocks_enabled` but
+is **off by default**. Classic Shadowsocks is easily DPI-fingerprinted and is actively
+blocked in Russia, and the panel emits its `ss://` link in the legacy fully-base64 URI
+form (hardcoded in the bundled v2share library, not SIP002) that some base64-only
+clients reject - which breaks the whole base64 subscription feed. The four protocols
+above cover the same need. Flipping the flag to `true` re-enables the inbound and its
+firewall port; the cipher is then chosen per user by the panel.
 
 Hysteria2, TUIC, and Trojan all need TLS but the nodes carry no per-node domain, so
 they share one per-node self-signed cert and their subscription links set

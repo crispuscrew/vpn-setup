@@ -22,13 +22,16 @@
   notify: reload firewalld
   when: tuic_enabled | default(false) | bool
 
-- name: Open the Shadowsocks port in firewalld (TCP+UDP)
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ shadowsocks_port }}/{{ item }}"
+# Follows the flag: opens the port when Shadowsocks is enabled, and closes it again
+# when disabled (the default) so turning the protocol off leaves no dead opening. The
+# firewalld module applies permanent+immediate itself, so no reload handler is needed.
+- name: Set the Shadowsocks port state in firewalld (TCP+UDP)
+  ansible.posix.firewalld:
+    port: "{{ shadowsocks_port }}/{{ item }}"
+    permanent: true
+    immediate: true
+    state: "{{ 'enabled' if (shadowsocks_enabled | default(false) | bool) else 'disabled' }}"
   loop: [tcp, udp]
-  register: _fw_ss
-  changed_when: "'ALREADY_ENABLED' not in _fw_ss.stderr"
-  notify: reload firewalld
-  when: shadowsocks_enabled | default(false) | bool
 
 - name: Open the Trojan port in firewalld (TCP)
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ trojan_port }}/tcp"

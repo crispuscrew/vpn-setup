@@ -65,10 +65,16 @@ trojan_enabled: true
 # SNI presented in the TLS handshake (blending only; the cert is self-signed).
 tls_sni: "www.bing.com"
 
-# Shadowsocks is plaintext (its own AEAD, no TLS/domain), so it needs none of the
-# above - just an xray inbound and an open port. Cipher is chosen per user by the
-# panel (classic AEAD: aes-128-gcm / aes-256-gcm / chacha20-ietf-poly1305).
-shadowsocks_enabled: true
+# Shadowsocks (classic AEAD, no TLS/domain) is DISABLED by default, for two reasons.
+# Its plaintext handshake is easily DPI-fingerprinted and is actively blocked in
+# Russia (this deployment's target), so it adds little over the TLS-fronted protocols
+# above. And the panel emits its ss:// link in the legacy fully-base64 URI form
+# (hardcoded in the bundled v2share library, not SIP002), which some base64-only
+# clients reject - poisoning the whole base64 subscription feed. The four protocols
+# above cover the same need. Flip to true to re-enable: the xray inbound and the
+# firewall port both follow this flag, and the cipher is chosen per user by the panel
+# (classic AEAD: aes-128-gcm / aes-256-gcm / chacha20-ietf-poly1305).
+shadowsocks_enabled: false
 
 # VLESS-Reality borrow target (dest + serverNames). Must be a real, reachable
 # TLS 1.3 + X25519 site whose handshake xray can proxy. Verified good defaults:

@@ -33,13 +33,15 @@
     proto: udp
   when: tuic_enabled | default(false) | bool
 
-- name: Allow the Shadowsocks port (TCP+UDP)
+# Follows the flag: allow when Shadowsocks is enabled, delete the rule when disabled
+# (the default) so turning the protocol off removes the opening instead of leaving it.
+- name: Set the Shadowsocks port rule (TCP+UDP)
   community.general.ufw:
     rule: allow
     port: "{{ shadowsocks_port }}"
     proto: "{{ item }}"
+    delete: "{{ not (shadowsocks_enabled | default(false) | bool) }}"
   loop: [tcp, udp]
-  when: shadowsocks_enabled | default(false) | bool
 
 - name: Allow the Trojan port (TCP)
   community.general.ufw:
