@@ -8,7 +8,7 @@
 
 Automated, multi-protocol VPN deployment built on **[Marzneshin](https://github.com/marzneshin/marzneshin)**.
 It stands up a Marzneshin panel plus one or more `marznode` nodes — which bundle
-Xray, Hysteria2, and sing-box — to serve **VLESS+Reality, VMess, Trojan, Shadowsocks,
+Xray, Hysteria2, and sing-box — to serve **VLESS+Reality, VMess, Trojan,
 Hysteria2, TUIC, and ShadowTLS** from one place, and delivers each user's
 **subscription URL + QR** over a Telegram bot. Direct access today; multi-hop is a
 planned later layer.
