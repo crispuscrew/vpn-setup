@@ -12,3 +12,4 @@ services:
     volumes:
       - {{ vpnbot_state_dir }}:/state
       - {{ vpnbot_compose_dir }}/awg_ssh_key:/awg_ssh_key:ro
+      - {{ vpnbot_compose_dir }}/known_hosts:/known_hosts:ro

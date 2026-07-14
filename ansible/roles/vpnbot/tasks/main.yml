@@ -49,6 +49,29 @@
   no_log: true
   notify: restart vpnbot
 
+# Pin each AmneziaWG node's SSH host key so the bot verifies node identity instead of
+# trusting any host (the agent falls back to no verification when the file is unset).
+# Scanned from this panel host - which reaches the nodes on 22 just as the bot does -
+# and sorted so the file is byte-stable (idempotent, no needless restart).
+- name: Resolve the AmneziaWG node hosts
+  ansible.builtin.set_fact:
+    _awg_hosts: "{{ groups['all'] | map('extract', hostvars)
+                    | selectattr('awg_enabled', 'defined') | selectattr('awg_enabled')
+                    | map(attribute='ansible_host') | list }}"
+
+- name: Scan the AmneziaWG node host keys
+  ansible.builtin.command: "ssh-keyscan -T 5 {{ _awg_hosts | join(' ') }}"
+  register: _awg_hostkeys
+  changed_when: false
+  when: _awg_hosts | length > 0
+
+- name: Install the vpnbot known_hosts
+  ansible.builtin.copy:
+    content: "{{ (_awg_hostkeys.stdout_lines | default([]) | sort | join('\n')) ~ '\n' }}"
+    dest: "{{ vpnbot_compose_dir }}/known_hosts"
+    mode: "0644"
+  notify: restart vpnbot
+
 # no_log: the rendered .env holds VPNBOT_TOKEN and the panel password; without it a
 # --diff or -vvv run would print them to the log.
 - name: Render the vpnbot env
