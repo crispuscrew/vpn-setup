@@ -1,6 +1,8 @@
 # Debian has no host firewall configured by default. Use ufw, and allow SSH FIRST
 # so enabling the firewall can never lock us out. Then the Reality port; the gRPC
 # port from the panel is opened later, in remote_prep.yml, for remote nodes only.
+# Every toggled protocol below follows its flag: allow when enabled, delete the rule
+# when disabled, so turning a protocol off removes its opening instead of leaving it.
 - name: Install ufw
   ansible.builtin.apt:
     name: ufw
@@ -19,22 +21,20 @@
     port: "{{ reality_port }}"
     proto: tcp
 
-- name: Allow the Hysteria2 port (UDP)
+- name: Set the Hysteria2 port rule (UDP)
   community.general.ufw:
     rule: allow
     port: "{{ hysteria2_port }}"
     proto: udp
-  when: hysteria2_enabled | default(false) | bool
+    delete: "{{ not (hysteria2_enabled | default(false) | bool) }}"
 
-- name: Allow the TUIC port (UDP)
+- name: Set the TUIC port rule (UDP)
   community.general.ufw:
     rule: allow
     port: "{{ tuic_port }}"
     proto: udp
-  when: tuic_enabled | default(false) | bool
+    delete: "{{ not (tuic_enabled | default(false) | bool) }}"
 
-# Follows the flag: allow when Shadowsocks is enabled, delete the rule when disabled
-# (the default) so turning the protocol off removes the opening instead of leaving it.
 - name: Set the Shadowsocks port rule (TCP+UDP)
   community.general.ufw:
     rule: allow
@@ -43,12 +43,12 @@
     delete: "{{ not (shadowsocks_enabled | default(false) | bool) }}"
   loop: [tcp, udp]
 
-- name: Allow the Trojan port (TCP)
+- name: Set the Trojan port rule (TCP)
   community.general.ufw:
     rule: allow
     port: "{{ trojan_port }}"
     proto: tcp
-  when: trojan_enabled | default(false) | bool
+    delete: "{{ not (trojan_enabled | default(false) | bool) }}"
 
 - name: Enable ufw (default deny incoming, allow outgoing)
   community.general.ufw:

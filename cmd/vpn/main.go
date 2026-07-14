@@ -47,7 +47,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`vpn — operator CLI for vpn-setup (Marzneshin panel control)
+	fmt.Print(`vpn - operator CLI for vpn-setup (Marzneshin panel control)
 
 usage:
   vpn apply [-f vpn.yaml]     reconcile the panel to the declared config-as-code

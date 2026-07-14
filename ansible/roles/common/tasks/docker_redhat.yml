@@ -1,6 +1,6 @@
 # Install Docker CE + the compose plugin from Docker's own repo. Marzneshin is
 # upstream-tested on Docker; we run its stack there (our own build pipeline stays
-# on Podman). Podman may coexist — Docker uses its own daemon.
+# on Podman). Podman may coexist - Docker uses its own daemon.
 - name: Add the Docker CE repository
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/centos/docker-ce.repo

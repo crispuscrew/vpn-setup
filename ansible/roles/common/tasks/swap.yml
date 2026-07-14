@@ -1,5 +1,5 @@
 # Add a swapfile only when the host has no active swap. dd (not fallocate) so the
-# file is fully allocated — mkswap rejects sparse files.
+# file is fully allocated - mkswap rejects sparse files.
 - name: Detect existing swap
   ansible.builtin.command: swapon --noheadings --show=NAME
   register: swap_show

@@ -1,26 +1,28 @@
-# RedHat/AlmaLinux ship firewalld; open the protocol ports in it. Note: firewall-cmd
-# prints "success" to stdout but the "ALREADY_ENABLED" warning to stderr, so the
-# idempotency check must look at stderr - checking stdout would report changed (and
-# reload firewalld) on every run.
+# RedHat/AlmaLinux ship firewalld. The always-on Reality port is opened with a raw
+# firewall-cmd (note: it prints "success" to stdout but "ALREADY_ENABLED" to stderr,
+# so the idempotency check reads stderr - stdout would report changed, and reload
+# firewalld, on every run). Every toggled protocol below instead uses the firewalld
+# module with state derived from its flag, so disabling a protocol closes its port
+# rather than leaving a dead opening (permanent+immediate, no reload handler needed).
 - name: Open the Reality port in firewalld
   ansible.builtin.command: "firewall-cmd --permanent --add-port={{ reality_port }}/tcp"
   register: _fw_reality
   changed_when: "'ALREADY_ENABLED' not in _fw_reality.stderr"
   notify: reload firewalld
 
-- name: Open the Hysteria2 port in firewalld (UDP)
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ hysteria2_port }}/udp"
-  register: _fw_hy2
-  changed_when: "'ALREADY_ENABLED' not in _fw_hy2.stderr"
-  notify: reload firewalld
-  when: hysteria2_enabled | default(false) | bool
+- name: Set the Hysteria2 port state in firewalld (UDP)
+  ansible.posix.firewalld:
+    port: "{{ hysteria2_port }}/udp"
+    permanent: true
+    immediate: true
+    state: "{{ 'enabled' if (hysteria2_enabled | default(false) | bool) else 'disabled' }}"
 
-- name: Open the TUIC port in firewalld (UDP)
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ tuic_port }}/udp"
-  register: _fw_tuic
-  changed_when: "'ALREADY_ENABLED' not in _fw_tuic.stderr"
-  notify: reload firewalld
-  when: tuic_enabled | default(false) | bool
+- name: Set the TUIC port state in firewalld (UDP)
+  ansible.posix.firewalld:
+    port: "{{ tuic_port }}/udp"
+    permanent: true
+    immediate: true
+    state: "{{ 'enabled' if (tuic_enabled | default(false) | bool) else 'disabled' }}"
 
 # Follows the flag: opens the port when Shadowsocks is enabled, and closes it again
 # when disabled (the default) so turning the protocol off leaves no dead opening. The
@@ -33,9 +35,9 @@
     state: "{{ 'enabled' if (shadowsocks_enabled | default(false) | bool) else 'disabled' }}"
   loop: [tcp, udp]
 
-- name: Open the Trojan port in firewalld (TCP)
-  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ trojan_port }}/tcp"
-  register: _fw_trojan
-  changed_when: "'ALREADY_ENABLED' not in _fw_trojan.stderr"
-  notify: reload firewalld
-  when: trojan_enabled | default(false) | bool
+- name: Set the Trojan port state in firewalld (TCP)
+  ansible.posix.firewalld:
+    port: "{{ trojan_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: "{{ 'enabled' if (trojan_enabled | default(false) | bool) else 'disabled' }}"
