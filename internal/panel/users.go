@@ -56,9 +56,10 @@ func (c *Client) CreateUser(ctx context.Context, username, expireStrategy string
 	return &out, nil
 }
 
-// UpdateUser replaces a user's services and expire strategy. The panel PUT is a
-// full replace: it requires the username in the body and takes the service list
-// verbatim, so an empty list clears every service.
+// UpdateUser sets a user's services and expire strategy. The panel PUT is a partial
+// update (exclude_unset): it requires the username in the body, and fields we omit
+// (data_limit, note, ...) are preserved. We always send service_ids, taken verbatim,
+// so an empty list explicitly clears every service.
 func (c *Client) UpdateUser(ctx context.Context, username, expireStrategy string, serviceIDs []int) (*User, error) {
 	if serviceIDs == nil {
 		serviceIDs = []int{}

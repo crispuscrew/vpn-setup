@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/crispuscrew/vpn-setup/internal/panel"
@@ -80,7 +81,9 @@ func TestResolveInboundsByNode(t *testing.T) {
 		t.Errorf("two nodes: got %v want [1 3]", multi)
 	}
 
-	if _, err := resolveInbounds(ServiceSpec{Name: "x", Nodes: []string{"Mars"}}, inbounds); err == nil {
-		t.Error("unknown node: expected an error, got nil")
+	// An absent/down node must return errNodeNoInbound so applyServices skips just that
+	// service instead of aborting the whole reconcile.
+	if _, err := resolveInbounds(ServiceSpec{Name: "x", Nodes: []string{"Mars"}}, inbounds); !errors.Is(err, errNodeNoInbound) {
+		t.Errorf("absent node: want errNodeNoInbound, got %v", err)
 	}
 }
