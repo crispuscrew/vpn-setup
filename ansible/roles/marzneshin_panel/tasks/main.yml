@@ -22,15 +22,25 @@
     dest: "{{ panel_compose_dir }}/docker-compose.yml"
     mode: "0644"
 
-# Expose the panel port publicly only when nothing fronts it. With panel_domain
-# set, Caddy terminates TLS on 443 and reaches the panel over loopback, so the
-# plain-HTTP port is closed to the internet.
-- name: Panel port open only without a TLS reverse proxy
+# Expose the panel port publicly only when nothing fronts it. With panel_domain set,
+# Caddy terminates TLS and reaches the panel over loopback (and the panel binds
+# 127.0.0.1), so the plain-HTTP port is closed to the internet. Branch by OS so a
+# Debian panel host works too, mirroring the marznode firewall split.
+- name: Panel port (firewalld / RedHat) - open only without a TLS reverse proxy
   ansible.posix.firewalld:
     port: "{{ panel_port }}/tcp"
     permanent: true
     immediate: true
     state: "{{ 'disabled' if (panel_domain | default('') | length > 0) else 'enabled' }}"
+  when: ansible_os_family == 'RedHat'
+
+- name: Panel port (ufw / Debian) - open only without a TLS reverse proxy
+  community.general.ufw:
+    rule: allow
+    port: "{{ panel_port }}"
+    proto: tcp
+    delete: "{{ (panel_domain | default('') | length > 0) }}"
+  when: ansible_os_family == 'Debian'
 
 - name: Start the panel
   ansible.builtin.command:
