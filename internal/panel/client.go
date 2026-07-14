@@ -1,6 +1,6 @@
 // Package panel is a small typed client for the Marzneshin panel REST API. It
-// covers the entities vpn-setup drives as config-as-code — inbounds, services,
-// and users — plus JWT sudo-admin auth. Host/node provisioning stays in Ansible.
+// covers the entities vpn-setup drives as config-as-code - inbounds, services,
+// and users - plus JWT sudo-admin auth. Host/node provisioning stays in Ansible.
 package panel
 
 import (

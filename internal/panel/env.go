@@ -7,7 +7,7 @@ import (
 )
 
 // FromEnv builds a client from VPN_PANEL_URL/USERNAME/PASSWORD and authenticates
-// it. Credentials come from the environment only — never from files or flags — so
+// it. Credentials come from the environment only - never from files or flags - so
 // the same contract serves both the vpn CLI and the vpnbot.
 func FromEnv(ctx context.Context) (*Client, error) {
 	base := os.Getenv("VPN_PANEL_URL")

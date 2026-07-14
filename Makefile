@@ -1,10 +1,10 @@
-# vpn-setup — build the Go tooling and run the pipeline in a container.
+# vpn-setup - build the Go tooling and run the pipeline in a container.
 # `make help` (default) lists targets. The Go build/test/lint run inside a pinned
 # golang image (dev-rules/tech/containers.md); nothing touches the host toolchain.
 
 .DEFAULT_GOAL := help
 
-# Prefer rootless Podman, fall back to Docker — never hardcode one.
+# Prefer rootless Podman, fall back to Docker - never hardcode one.
 ENGINE := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 GO_IMAGE := docker.io/library/golang:1.24.10-alpine
 VPNBOT_IMAGE ?= vpn-setup/vpnbot:dev

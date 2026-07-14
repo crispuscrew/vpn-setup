@@ -46,13 +46,17 @@
     owner: "{{ vpnbot_uid }}"
     group: "{{ vpnbot_uid }}"
     mode: "0600"
+  no_log: true
   notify: restart vpnbot
 
+# no_log: the rendered .env holds VPNBOT_TOKEN and the panel password; without it a
+# --diff or -vvv run would print them to the log.
 - name: Render the vpnbot env
   ansible.builtin.template:
     src: env.j2
     dest: "{{ vpnbot_compose_dir }}/.env"
     mode: "0600"
+  no_log: true
   notify: restart vpnbot
 
 - name: Render the vpnbot compose file

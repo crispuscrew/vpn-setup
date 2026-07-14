@@ -7,7 +7,7 @@ ansible/inventory/*
 !ansible/inventory/*.example
 ansible/.secrets/
 
-# Secrets and credentials — never commit
+# Secrets and credentials - never commit
 *.pem
 *.key
 *.crt

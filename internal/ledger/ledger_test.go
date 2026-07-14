@@ -173,7 +173,7 @@ func TestClaimIsExactlyOnce(t *testing.T) {
 		t.Fatalf("second claim err: %v", err)
 	}
 	if first {
-		t.Fatal("second claim reported a first delivery — exactly-once violated")
+		t.Fatal("second claim reported a first delivery - exactly-once violated")
 	}
 }
 

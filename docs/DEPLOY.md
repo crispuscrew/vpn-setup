@@ -9,8 +9,8 @@ bot. For the design behind it see the [README](../README.md); this is the runboo
 - A **panel** host running Marzneshin plus a local all-in-one `marznode` that serves
   VLESS-Reality.
 - Zero or more **extra node** hosts, each running a `marznode` the panel reaches over
-  mutual TLS. A user's single subscription spans every node, and clients auto-select
-  the fastest with failover.
+  mutual TLS. A user's single subscription spans the servers they are granted, and
+  clients auto-select the fastest with failover.
 - The `vpn` CLI reconciling panel services and users from `vpn.yaml`.
 - The `vpnbot` Telegram bot handing each user their subscription URL and QR.
 
