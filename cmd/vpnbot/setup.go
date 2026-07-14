@@ -65,9 +65,7 @@ func (a *app) onSetupPick(c tele.Context) error {
 	if !ok {
 		return c.Respond(&tele.CallbackResponse{Text: m.unknownPlatform})
 	}
-	if err := c.Respond(); err != nil {
-		return err
-	}
+	_ = c.Respond()
 	steps = steps + "\n\n" + m.multiServerNote
 	if link, ok := a.subURLForChat(c.Chat().ID); ok {
 		steps = fmt.Sprintf(m.subLinkPrefix, link) + steps

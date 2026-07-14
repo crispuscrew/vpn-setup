@@ -2,12 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"sort"
 
 	"github.com/crispuscrew/vpn-setup/internal/panel"
 )
+
+// errNodeNoInbound marks a node-selected service whose node currently reports no
+// inbound (typically a node that is momentarily disconnected). It is recoverable, so
+// applyServices skips that one service rather than aborting the whole reconcile.
+var errNodeNoInbound = errors.New("no inbound on node")
 
 func runApply(args []string) error {
 	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
@@ -58,7 +64,7 @@ func resolveInbounds(spec ServiceSpec, inbounds []panel.Inbound) ([]int, error) 
 		}
 		for name := range wanted {
 			if !seen[name] {
-				return nil, fmt.Errorf("service %q: no inbound on node %q", spec.Name, name)
+				return nil, fmt.Errorf("service %q: %w %q", spec.Name, errNodeNoInbound, name)
 			}
 		}
 		sort.Ints(ids)
@@ -110,6 +116,13 @@ func applyServices(ctx context.Context, client *panel.Client, specs []ServiceSpe
 	for _, spec := range specs {
 		want, err := resolveInbounds(spec, inbounds)
 		if err != nil {
+			// A node with no inbound right now (e.g. transiently disconnected) must not
+			// abort the whole reconcile; skip this one service, leaving its current panel
+			// membership untouched, and warn so the operator re-applies once it is back.
+			if errors.Is(err, errNodeNoInbound) {
+				fmt.Printf("service %-16s skipped (%v)\n", spec.Name, err)
+				continue
+			}
 			return nil, err
 		}
 		if have, ok := current[spec.Name]; ok {

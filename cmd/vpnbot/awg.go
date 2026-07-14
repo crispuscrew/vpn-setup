@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -95,18 +96,46 @@ func (a *app) awgLocationsFor(ctx context.Context, client *panel.Client, usernam
 	if err != nil {
 		return nil, err
 	}
-	granted, err := grantedNames(ctx, client, user.ServiceIDs)
+	inbounds, err := client.Inbounds(ctx)
 	if err != nil {
 		return nil, err
 	}
-	locations := make([]string, 0, len(granted))
-	for _, name := range granted {
-		if _, ok := a.awgNodes[name]; ok {
-			locations = append(locations, name)
+	return awgLocationsFrom(user.ServiceIDs, inbounds, a.awgNodes), nil
+}
+
+// awgLocationsFrom resolves a user's granted services to the AWG-capable node names.
+// It maps through inbounds (service -> node) rather than matching service names to
+// node names, so a multi-node service like "all" expands to its member nodes instead
+// of matching nothing - otherwise a user granted only "all" would see no locations.
+func awgLocationsFrom(grantedServiceIDs []int, inbounds []panel.Inbound, awgNodes map[string]string) []string {
+	granted := make(map[int]bool, len(grantedServiceIDs))
+	for _, id := range grantedServiceIDs {
+		granted[id] = true
+	}
+	seen := make(map[string]bool)
+	var locations []string
+	for _, inbound := range inbounds {
+		if !anyGranted(inbound.ServiceIDs, granted) {
+			continue
+		}
+		node := inbound.Node.Name
+		if _, ok := awgNodes[node]; ok && !seen[node] {
+			seen[node] = true
+			locations = append(locations, node)
 		}
 	}
 	sort.Strings(locations)
-	return locations, nil
+	return locations
+}
+
+// anyGranted reports whether any of a inbound's service ids is one the user holds.
+func anyGranted(serviceIDs []int, granted map[int]bool) bool {
+	for _, id := range serviceIDs {
+		if granted[id] {
+			return true
+		}
+	}
+	return false
 }
 
 func awgLocationMarkup(username string, locations []string) *tele.ReplyMarkup {
@@ -150,6 +179,9 @@ func (a *app) onAWGPick(c tele.Context) error {
 
 	conf, err := a.provisionAWG(ctx, client, username, location, host)
 	if err != nil {
+		if errors.Is(err, errRevoked) {
+			return c.Send(m.awgNoLocations)
+		}
 		log.Printf("awg provision %s@%s: %v", username, location, err)
 		return c.Send(m.awgFailed)
 	}
@@ -170,12 +202,27 @@ func (a *app) stillGranted(ctx context.Context, client *panel.Client, username, 
 	return false
 }
 
+// errRevoked signals that a user became ineligible (untracked or no longer granted
+// the location) between the pre-lock checks and provisioning - i.e. a concurrent
+// /revoke won the race - so no config should be minted or sent.
+var errRevoked = errors.New("user no longer eligible for this location")
+
 // provisionAWG reuses the user's stored peer for a location or mints one, ensures
 // it exists on the node (idempotent), and returns the rendered client config.
-func (a *app) provisionAWG(ctx context.Context, _ *panel.Client, username, location, host string) (string, error) {
-	// Serialise per user so a double-tap can't mint two peers for one location.
+func (a *app) provisionAWG(ctx context.Context, client *panel.Client, username, location, host string) (string, error) {
+	// Serialise per user so a double-tap can't mint two peers for one location, and
+	// re-validate eligibility under the lock: /revoke holds this same lock while it
+	// removes the ledger entry and tears down peers, so a tap that passed the pre-lock
+	// checks must not re-provision a just-revoked user (which would hand them a live
+	// tunnel after the admin believes they are cut off).
 	unlock := a.lockUser(username)
 	defer unlock()
+	if _, tracked := a.ledger.ByUsername(username); !tracked {
+		return "", errRevoked
+	}
+	if !a.stillGranted(ctx, client, username, location) {
+		return "", errRevoked
+	}
 	peer, ok := a.ledger.AWGPeer(username, location)
 	if !ok {
 		kp, err := awg.GenerateKeypair()

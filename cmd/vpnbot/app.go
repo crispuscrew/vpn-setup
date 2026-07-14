@@ -77,7 +77,7 @@ func (a *app) deliver(c tele.Context, username string) error {
 		if panel.NotFound(err) {
 			return c.Send(m.accountNotFound)
 		}
-		return err
+		return c.Send(m.panelDown)
 	}
 	png, err := qrcode.Encode(user.SubscriptionURL, qrcode.Medium, qrPixelSize)
 	if err != nil {

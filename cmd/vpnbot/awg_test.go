@@ -1,6 +1,57 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/crispuscrew/vpn-setup/internal/panel"
+)
+
+func TestAWGLocationsFrom(t *testing.T) {
+	awgNodes := map[string]string{"Estonia": "h", "Serbia": "h", "USA": "h", "Russia": "h"}
+	// service 1 = "all" (exit nodes only), 2 = Estonia, 4 = Serbia, 5 = USA, 3 = Russia.
+	inbounds := []panel.Inbound{
+		{ID: 1, ServiceIDs: []int{1, 2}, Node: panel.InboundNode{Name: "Estonia"}},
+		{ID: 2, ServiceIDs: []int{1, 2}, Node: panel.InboundNode{Name: "Estonia"}}, // 2nd inbound, same node
+		{ID: 3, ServiceIDs: []int{1, 4}, Node: panel.InboundNode{Name: "Serbia"}},
+		{ID: 4, ServiceIDs: []int{1, 5}, Node: panel.InboundNode{Name: "USA"}},
+		{ID: 5, ServiceIDs: []int{3}, Node: panel.InboundNode{Name: "Russia"}},
+	}
+	cases := []struct {
+		name    string
+		granted []int
+		want    []string
+	}{
+		{"all expands to exit nodes, excludes Russia", []int{1}, []string{"Estonia", "Serbia", "USA"}},
+		{"per-location Estonia dedups its two inbounds", []int{2}, []string{"Estonia"}},
+		{"Russia service", []int{3}, []string{"Russia"}},
+		{"all plus Russia", []int{1, 3}, []string{"Estonia", "Russia", "Serbia", "USA"}},
+		{"no grants", nil, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := awgLocationsFrom(tc.granted, inbounds, awgNodes); !equalStrings(got, tc.want) {
+				t.Errorf("awgLocationsFrom(%v) = %v, want %v", tc.granted, got, tc.want)
+			}
+		})
+	}
+	// A node with no AWG agent is excluded even when the user is granted it.
+	noUSA := map[string]string{"Estonia": "h", "Serbia": "h", "Russia": "h"}
+	if got := awgLocationsFrom([]int{1}, inbounds, noUSA); !equalStrings(got, []string{"Estonia", "Serbia"}) {
+		t.Errorf("no-AWG-node: got %v want [Estonia Serbia]", got)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
 func TestParseAWGNodes(t *testing.T) {
 	nodes, err := parseAWGNodes("Estonia=150.0.0.1, Russia=31.0.0.2 , USA=8.8.8.8")
