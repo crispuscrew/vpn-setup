@@ -13,6 +13,7 @@ var enMsg = msg{
 	helpAdmin: "\nAdmin:\n" +
 		"/add <username> - create a user, pick their locations, get a claim link\n" +
 		"/list - show tracked users and their delivery status\n" +
+		"/import - add every panel user not yet in the bot, get their claim links\n" +
 		"/revoke <username> - rotate a user's key so their link stops working\n",
 	notAuthorised:   "Not authorised.",
 	panelDown:       "The panel is unavailable right now - please try again later.",
@@ -22,6 +23,10 @@ var enMsg = msg{
 	listUnclaimed:   "unclaimed",
 	listDelivered:   "delivered → chat %d",
 	listLine:        "• %s - %s\n",
+	importNone:      "Nothing to import - every panel user is already tracked by the bot.",
+	importHeader:    "Imported %d user(s). Forward each person their one-time link:\n",
+	importLine:      "• %s → %s\n",
+	importFailed:    "• %s - could not create a claim link, retry /import\n",
 	revokeUsage:     "usage: /revoke <username>",
 	revokeNoUser:    "No such user: %s",
 	revokeFailed:    "Revoke failed: %s",

@@ -61,6 +61,10 @@ type msg struct {
 	listUnclaimed    string
 	listDelivered    string // takes chat id
 	listLine         string // takes name, status
+	importNone       string
+	importHeader     string // takes count
+	importLine       string // takes username, link
+	importFailed     string // takes username
 	revokeUsage      string
 	revokeNoUser     string // takes username
 	revokeFailed     string // takes error
