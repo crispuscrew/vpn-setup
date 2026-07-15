@@ -27,6 +27,77 @@ services:
   - name: USA
     nodes: ["USA"]
 
-# Real users are provisioned by the bot's admin /add, not declared here. Add an
-# entry only to manage a user as code (reconcile is additive - it never prunes).
-users: []
+# Users migrated from the prior amnezia-ansible deployment, matched by location. The
+# Estonia/Serbia/USA amnezia exits are the same servers this panel runs, so grants map
+# 1:1. Germany (SecondTurkey, 80.66.85.91) has no counterpart here and is excluded, so
+# its Germany-only names are not migrated. amnezia issued two device-configs per person
+# (person_1/person_2); those collapse into one multi-device subscription per person, and
+# the owner's several crispus* profiles fold into a single crispuscrew.
+#
+# Reconcile is additive: re-applying updates grants on any that already exist and prunes
+# nothing. Provisioning here (as code) does not deliver links - that is a later step.
+users:
+  # Owner + shared break-glass: the auto-select pool (Estonia+Serbia+USA).
+  - username: crispuscrew
+    services: ["all"]
+    expire_strategy: never
+    note: "owner (folded crispus* profiles)"
+  - username: emergency
+    services: ["all"]
+    expire_strategy: never
+    note: "shared break-glass"
+  # Two locations.
+  - username: rostik2099
+    services: ["Estonia", "USA"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia+USA"
+  - username: f1anker
+    services: ["Estonia", "USA"]
+    expire_strategy: never
+    note: "migrated: amnezia USA; +Estonia per owner"
+  # USA.
+  - username: glavniy_fanatik
+    services: ["USA"]
+    expire_strategy: never
+    note: "migrated: amnezia USA"
+  - username: miandic_n
+    services: ["USA"]
+    expire_strategy: never
+    note: "migrated: amnezia USA"
+  - username: sbe2004
+    services: ["USA"]
+    expire_strategy: never
+    note: "migrated: amnezia USA"
+  - username: timafaer
+    services: ["USA"]
+    expire_strategy: never
+    note: "migrated: amnezia USA"
+  # Estonia.
+  - username: blsoo
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: bozhenkanya
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: ili71a
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: lobov793
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: prolongator_b78
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: ronaxaa
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
+  - username: s_mokhirev
+    services: ["Estonia"]
+    expire_strategy: never
+    note: "migrated: amnezia Estonia"
