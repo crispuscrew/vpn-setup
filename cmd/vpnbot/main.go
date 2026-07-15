@@ -1,7 +1,8 @@
 // Command vpnbot is the Telegram delivery bot for vpn-setup. Admins create panel
 // users with /add and hand out a one-time claim link; the owner sends /start <code>
 // and receives their subscription URL + QR exactly once (tracked in a durable
-// ledger), re-shown on demand. /list and /revoke round out the admin face.
+// ledger), re-shown on demand. /list, /import, and /revoke round out the admin
+// face; /import backfills claim links for panel users created outside the bot.
 //
 // All secrets come from the environment, never files: VPNBOT_TOKEN (from BotFather),
 // VPNBOT_ADMINS (comma-separated Telegram user ids), and the VPN_PANEL_* credentials
@@ -99,6 +100,7 @@ func run() error {
 	bot.Handle("/awg", application.onAWG)
 	bot.Handle("/add", application.onAdd)
 	bot.Handle("/list", application.onList)
+	bot.Handle("/import", application.onImport)
 	bot.Handle("/revoke", application.onRevoke)
 	bot.Handle(&setupBtn, application.onSetupPick)
 	bot.Handle(&langBtn, application.onLangPick)
